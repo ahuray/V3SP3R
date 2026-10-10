@@ -329,6 +329,7 @@ object FapHubCatalog {
         add(packApp("analog_clock", "Analog Clock", "Analog clock on the Flipper screen.", FapCategory.TOOLS, "Tools", "@scrolltex", "1.4", FapPack.DAILY))
         add(packApp("dice_app", "Dice", "Coin and polyhedral dice.", FapCategory.TOOLS, "Tools", "Flipper catalog", "1.3", FapPack.DAILY))
         add(packApp("flipp_pomodoro", "Pomodoro", "Pomodoro timer.", FapCategory.TOOLS, "Tools", "@Th3Un1q3", "1.5", FapPack.DAILY))
+        add(packApp("clock_o_dial", "Clock'o'Dial", "Workday clock that warns you before overtime.", FapCategory.TOOLS, "Tools", "Ilia Petrov-Komotskii", "1.0", FapPack.DAILY))
         add(packApp("lightmeter", "Lightmeter", "Photography light meter using the built-in light sensor.", FapCategory.TOOLS, "Tools", "Oleksii Kutuzov", "1.3", FapPack.DAILY))
         add(packApp("animation_switcher", "Animation Switcher", "Swap the desktop dolphin animation from the SD card.", FapCategory.TOOLS, "Tools", "@lsalik2", "1.1", FapPack.DAILY))
         add(packApp("music_player", "Music Player", "Play RTTTL tunes on the speaker.", FapCategory.MEDIA, "Media", "@DrZlo13", "1.4", FapPack.DAILY))
@@ -340,6 +341,7 @@ object FapHubCatalog {
         add(packApp("weather_station", "Weather Station", "Receive outdoor weather sensors on Sub-GHz.", FapCategory.SUBGHZ, "Sub-GHz", "@Skorpionm", "2.0", FapPack.RADIO))
         add(packApp("pocsag_pager", "POCSAG Pager", "Capture POCSAG 1200 pager bursts on the internal radio.", FapCategory.SUBGHZ, "Sub-GHz", "@xMasterX, @Shmuma", "1.4", FapPack.RADIO))
         add(packApp("ir_scope", "IR Scope", "Watch incoming infrared signals.", FapCategory.INFRARED, "Infrared", "@kallanreed", "1.4", FapPack.RADIO))
+        add(packApp("longwave_clock", "Longwave Clock", "Demo DCF77 and MSF time signals on the bare Flipper. Live decode needs a small longwave receiver on GPIO.", FapCategory.GPIO, "GPIO", "@m7i-org", "0.1", FapPack.RADIO))
 
         // Sharp tools that still run on the bare device
         add(packApp("nfc_magic", "NFC Magic", "Write NFC tags whose sector 0 can be changed.", FapCategory.NFC, "NFC", "@AloneLiberty", "1.15", FapPack.EDGE))
@@ -360,6 +362,8 @@ object FapHubCatalog {
         add(packApp("video_player", "Video Player", "Play a video on the Flipper screen.", FapCategory.MEDIA, "Media", "LTVA", "0.4", FapPack.PLAY))
         add(packApp("image_viewer", "Image Viewer", "Show pictures on the Flipper screen.", FapCategory.MEDIA, "Media", "@polioan", "0.1", FapPack.PLAY))
         add(packApp("usb_midi", "USB-MIDI", "Turn the Flipper into a USB MIDI controller.", FapCategory.USB, "USB", "@Kribesk", "1.0", FapPack.PLAY))
+        add(packApp("morse_trainer", "Morse Trainer", "Learn Morse from zero, one level at a time.", FapCategory.GAMES, "Games", "Baris Mert", "1.0", FapPack.PLAY))
+        add(packApp("brainfuck", "Brainfuck", "Brainfuck interpreter on the Flipper.", FapCategory.TOOLS, "Tools", "@nymda", "1.4", FapPack.PLAY))
     }
 
     val allApps: List<FapApp> get() = featuredApps

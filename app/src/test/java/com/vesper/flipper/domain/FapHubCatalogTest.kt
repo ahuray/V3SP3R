@@ -26,6 +26,18 @@ class FapHubCatalogTest {
     }
 
     @Test
+    fun `odd tools install from the official catalog aliases`() {
+        val longwave = FapHubCatalog.searchApps("longwave_clock").single()
+        assertEquals(FapPack.RADIO, longwave.pack)
+        assertEquals("/ext/apps/GPIO/longwave_clock.fap", FapHubCatalog.installPath(longwave))
+        assertFalse(longwave.needsModule)
+
+        assertEquals("/ext/apps/Tools/clock_o_dial.fap", FapHubCatalog.installPath(FapHubCatalog.searchApps("clock_o_dial").single()))
+        assertEquals("/ext/apps/Games/morse_trainer.fap", FapHubCatalog.installPath(FapHubCatalog.searchApps("morse_trainer").single()))
+        assertEquals("/ext/apps/Tools/brainfuck.fap", FapHubCatalog.installPath(FapHubCatalog.searchApps("brainfuck").single()))
+    }
+
+    @Test
     fun `edge pack is the sharp bare-device set`() {
         val edge = FapHubCatalog.appsInPack(FapPack.EDGE).map { it.id }.toSet()
         assertEquals(
