@@ -4,8 +4,11 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
+import com.vesper.flipper.ai.LlmProvider
+import com.vesper.flipper.ai.LlmSelection
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -17,30 +20,58 @@ class SettingsStore @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
 
-    // OpenRouter API Key
-    private val API_KEY = stringPreferencesKey("openrouter_api_key")
+    private val PROVIDER = stringPreferencesKey("llm_provider")
 
+    val selectedProvider: Flow<LlmProvider> = context.dataStore.data.map { preferences ->
+        LlmProvider.fromId(preferences[PROVIDER])
+    }
+
+    suspend fun setProvider(provider: LlmProvider) {
+        context.dataStore.edit { preferences ->
+            preferences[PROVIDER] = provider.id
+        }
+    }
+
+    /**
+     * API key for the active provider. The OpenRouter key stays in
+     * "openrouter_api_key" so existing installs keep working.
+     */
     val apiKey: Flow<String?> = context.dataStore.data.map { preferences ->
-        preferences[API_KEY]
+        val provider = LlmProvider.fromId(preferences[PROVIDER])
+        preferences[stringPreferencesKey(provider.apiKeyPreference)]?.takeIf { it.isNotBlank() }
     }
 
     suspend fun setApiKey(key: String) {
         context.dataStore.edit { preferences ->
-            preferences[API_KEY] = key
+            val provider = LlmProvider.fromId(preferences[PROVIDER])
+            val preference = stringPreferencesKey(provider.apiKeyPreference)
+            val trimmed = key.trim()
+            if (trimmed.isEmpty()) {
+                preferences.remove(preference)
+            } else {
+                preferences[preference] = trimmed
+            }
         }
     }
 
-    // Selected Model
-    private val SELECTED_MODEL = stringPreferencesKey("selected_model")
-
     val selectedModel: Flow<String> = context.dataStore.data.map { preferences ->
-        preferences[SELECTED_MODEL] ?: DEFAULT_MODEL
+        val provider = LlmProvider.fromId(preferences[PROVIDER])
+        preferences[stringPreferencesKey(provider.modelPreference)] ?: provider.defaultModel
     }
 
     suspend fun setSelectedModel(model: String) {
         context.dataStore.edit { preferences ->
-            preferences[SELECTED_MODEL] = model
+            val provider = LlmProvider.fromId(preferences[PROVIDER])
+            preferences[stringPreferencesKey(provider.modelPreference)] = model
         }
+    }
+
+    suspend fun readLlmSelection(): LlmSelection {
+        val preferences = context.dataStore.data.first()
+        val provider = LlmProvider.fromId(preferences[PROVIDER])
+        val apiKey = preferences[stringPreferencesKey(provider.apiKeyPreference)]?.takeIf { it.isNotBlank() }
+        val model = preferences[stringPreferencesKey(provider.modelPreference)] ?: provider.defaultModel
+        return LlmSelection(provider, apiKey, model)
     }
 
     // Last Connected Device
@@ -301,29 +332,13 @@ class SettingsStore @Inject constructor(
     }
 
     companion object {
-        // Default to the largest Hermes 4 model on OpenRouter.
-        const val DEFAULT_MODEL = "nousresearch/hermes-4-405b"
-        // Shimmer: soft, warm female — default TTS voice (OpenAI via OpenRouter)
+        val DEFAULT_MODEL: String = LlmProvider.OPENROUTER.defaultModel
         const val DEFAULT_TTS_VOICE = "shimmer"
         const val DEFAULT_AI_MAX_ITERATIONS = 10
         const val MIN_AI_MAX_ITERATIONS = 4
         const val MAX_AI_MAX_ITERATIONS = 20
 
-        // Used when fetching live catalog fails (offline/rate-limited).
-        val FALLBACK_MODELS = listOf(
-            ModelInfo("nousresearch/hermes-4-405b", "Hermes 4 405B", "Largest Hermes 4"),
-            ModelInfo("anthropic/claude-sonnet-4.5", "Claude Sonnet 4.5", "Latest Anthropic"),
-            ModelInfo("openai/gpt-oss-120b", "GPT-OSS 120B", "Latest OpenAI"),
-            ModelInfo("google/gemini-2.5-flash-image-preview", "Gemini 2.5 Flash Image Preview", "Latest Google"),
-            ModelInfo("meta-llama/llama-3.3-8b-instruct", "Llama 3.3 8B Instruct", "Latest Meta"),
-            ModelInfo("mistralai/devstral-small", "Devstral Small", "Latest Mistral"),
-            ModelInfo("x-ai/grok-4-fast", "Grok 4 Fast", "Latest xAI"),
-            ModelInfo("qwen/qwen3-coder", "Qwen3 Coder", "Latest Qwen"),
-            ModelInfo("deepseek/deepseek-r1-0528", "DeepSeek R1 0528", "Latest DeepSeek"),
-            ModelInfo("cohere/command-a", "Command A", "Latest Cohere"),
-            ModelInfo("moonshotai/kimi-k2", "Kimi K2", "Latest Moonshot"),
-            ModelInfo("z-ai/glm-4.5", "GLM 4.5", "Latest Z.ai")
-        )
+        val FALLBACK_MODELS: List<ModelInfo> = LlmProvider.OPENROUTER.models
 
         fun getModelDisplayName(
             modelId: String,

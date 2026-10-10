@@ -2,6 +2,7 @@ package com.vesper.flipper.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.vesper.flipper.ai.LlmProvider
 import com.vesper.flipper.ble.FlipperFileSystem
 import com.vesper.flipper.data.SettingsStore
 import com.vesper.flipper.domain.model.*
@@ -176,15 +177,17 @@ class SpectralOracleViewModel @Inject constructor(
 
     private suspend fun performAIAnalysis(request: SignalIntelRequest): OracleAnalysisResult =
         withContext(Dispatchers.IO) {
-            val apiKey = settingsStore.apiKey.first()
-                ?: throw Exception("API key not configured")
-
-            val model = settingsStore.selectedModel.first()
+            val selection = settingsStore.readLlmSelection()
+            val apiKey = selection.apiKey
+                ?: throw Exception("${selection.provider.displayName} API key not configured")
+            val provider = selection.provider
             val prompt = OraclePrompts.buildAnalysisPrompt(request)
+            val tokenField = if (provider.usesMaxCompletionTokens) "max_completion_tokens" else "max_tokens"
+            val temperatureJson = if (provider.allowsSamplingTemperature) ""","temperature": 0.3""" else ""
 
             val requestBody = """
             {
-                "model": "$model",
+                "model": ${json.encodeToString(kotlinx.serialization.serializer(), selection.model)},
                 "messages": [
                     {
                         "role": "system",
@@ -195,17 +198,20 @@ class SpectralOracleViewModel @Inject constructor(
                         "content": ${json.encodeToString(kotlinx.serialization.serializer(), prompt)}
                     }
                 ],
-                "max_tokens": 4000,
-                "temperature": 0.3
+                "$tokenField": 4000$temperatureJson
             }
             """.trimIndent()
 
             val httpRequest = Request.Builder()
-                .url("https://openrouter.ai/api/v1/chat/completions")
+                .url(provider.chatCompletionsUrl)
                 .addHeader("Authorization", "Bearer $apiKey")
                 .addHeader("Content-Type", "application/json")
-                .addHeader("HTTP-Referer", "https://vesper.flipper.app")
-                .addHeader("X-Title", "Vesper Spectral Oracle")
+                .apply {
+                    if (provider.sendsAttributionHeaders) {
+                        addHeader("HTTP-Referer", "https://vesper.flipper.app")
+                        addHeader("X-Title", "Vesper Spectral Oracle")
+                    }
+                }
                 .post(requestBody.toRequestBody("application/json".toMediaType()))
                 .build()
 
@@ -220,9 +226,7 @@ class SpectralOracleViewModel @Inject constructor(
 
                 parseAIResponse(responseBody, request)
             } catch (_: UnknownHostException) {
-                throw Exception(
-                    "Cannot resolve openrouter.ai (DNS/network issue). Verify internet access, disable broken Private DNS/VPN, then retry."
-                )
+                throw Exception(LlmProvider.dnsFailureMessage(provider.apiHost))
             }
         }
 
