@@ -1,7 +1,9 @@
 package com.vesper.flipper.domain
 
 import com.vesper.flipper.ble.FlipperFileSystem
+import com.vesper.flipper.data.SettingsStore
 import com.vesper.flipper.domain.executor.CommandExecutor
+import com.vesper.flipper.domain.executor.ForgeEngine
 import com.vesper.flipper.domain.executor.RiskAssessor
 import com.vesper.flipper.domain.model.AuditActionType
 import com.vesper.flipper.domain.model.AuditEntry
@@ -35,6 +37,8 @@ class CommandExecutorTest {
     private lateinit var permissionService: PermissionService
     private lateinit var auditService: AuditService
     private lateinit var diffService: DiffService
+    private lateinit var forgeEngine: ForgeEngine
+    private lateinit var settingsStore: SettingsStore
     private lateinit var commandExecutor: CommandExecutor
 
     @Before
@@ -44,12 +48,16 @@ class CommandExecutorTest {
         permissionService = mock()
         auditService = mock()
         diffService = mock()
+        forgeEngine = mock()
+        settingsStore = mock()
         commandExecutor = CommandExecutor(
             fileSystem = fileSystem,
             riskAssessor = riskAssessor,
             permissionService = permissionService,
             auditService = auditService,
-            diffService = diffService
+            diffService = diffService,
+            forgeEngine = forgeEngine,
+            settingsStore = settingsStore,
         )
     }
 

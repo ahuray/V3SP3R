@@ -2,6 +2,7 @@ package com.vesper.flipper.domain.executor
 
 import com.vesper.flipper.ble.FlipperFileSystem
 import com.vesper.flipper.data.SettingsStore
+import com.vesper.flipper.domain.catalog.FlipperCatalogClient
 import com.vesper.flipper.domain.model.*
 import com.vesper.flipper.domain.service.AuditService
 import com.vesper.flipper.domain.service.DiffService
@@ -40,6 +41,7 @@ class CommandExecutor @Inject constructor(
 ) {
 
     private val pendingApprovals = ConcurrentHashMap<String, PendingApproval>()
+    private val catalogClient = FlipperCatalogClient(httpClient)
 
     private val _currentApproval = MutableStateFlow<PendingApproval?>(null)
     val currentApproval: StateFlow<PendingApproval?> = _currentApproval.asStateFlow()
@@ -676,7 +678,7 @@ class CommandExecutor @Inject constructor(
             appendLine("FapHub matches for \"$query\":")
             matches.take(previewLimit).forEachIndexed { index, app ->
                 appendLine(
-                    "${index + 1}. ${app.name} (id=${app.id}, category=${app.category.name.lowercase()}, author=${app.author}, version=${app.version})"
+                    "${index + 1}. ${app.name} (id=${app.id}, pack=${app.pack.name.lowercase()}, folder=${app.installFolder}, author=${app.author}, version=${app.version})"
                 )
             }
             if (matches.size > previewLimit) {
@@ -702,9 +704,32 @@ class CommandExecutor @Inject constructor(
             )
         }
 
-        val installId = sanitizeAppIdentifier(app?.id ?: appIdOrName)
+        val catalogAlias = app?.catalogAlias?.takeIf { it.isNotBlank() }
+        val installId = sanitizeAppIdentifier(catalogAlias ?: app?.id ?: appIdOrName)
         val installName = app?.name ?: appIdOrName
-        val category = app?.category ?: FapCategory.MISC
+        val installFolder = app?.installFolder?.takeIf { it.isNotBlank() } ?: (app?.category ?: FapCategory.MISC).name.lowercase()
+
+        if (directDownloadUrl.isNullOrBlank() && catalogAlias != null) {
+            val firmware = try {
+                fileSystem.getDeviceInfo().getOrNull()?.firmwareVersion
+            } catch (_: Exception) {
+                null
+            }
+            val downloaded = catalogClient.downloadFap(catalogAlias, firmware)
+            if (downloaded.bytes.size > MAX_FAP_BYTES) {
+                throw IOException("Downloaded file too large (${downloaded.bytes.size} bytes)")
+            }
+            val installDir = "/ext/apps/$installFolder"
+            ensureDirectoryExists(installDir)
+            val targetPath = "$installDir/$installId.fap"
+            val bytesWritten = fileSystem.writeFileBytes(targetPath, downloaded.bytes).getOrThrow()
+            return CommandResultData(
+                bytesWritten = bytesWritten,
+                content = "installed_app=$installName\napp_id=$installId\nsdk_api=${downloaded.sdkApi}\nversion=${downloaded.version}\ntarget_path=$targetPath",
+                message = "Installed $installName to $targetPath"
+            )
+        }
+
         val sourceUrl = directDownloadUrl ?: app?.downloadUrl
             ?: throw IllegalArgumentException("Missing source URL for FapHub app install")
 
@@ -726,7 +751,7 @@ class CommandExecutor @Inject constructor(
             throw IOException("Downloaded file too large (${download.bytes.size} bytes)")
         }
 
-        val installDir = "/ext/apps/${category.name.lowercase()}"
+        val installDir = "/ext/apps/$installFolder"
         ensureDirectoryExists(installDir)
         val targetPath = "$installDir/$installId.fap"
         val bytesWritten = fileSystem.writeFileBytes(targetPath, download.bytes).getOrThrow()

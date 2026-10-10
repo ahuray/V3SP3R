@@ -1183,9 +1183,9 @@ class OpenRouterClient @Inject constructor(
             CommandAction.GET_DEVICE_INFO -> """{"action":"get_device_info","args":{}}"""
             CommandAction.GET_STORAGE_INFO -> """{"action":"get_storage_info","args":{}}"""
             CommandAction.SEARCH_FAPHUB ->
-                """{"action":"search_faphub","args":{"query":"wifi marauder"}}"""
+                """{"action":"search_faphub","args":{"query":"edge"}}"""
             CommandAction.INSTALL_FAPHUB_APP ->
-                """{"action":"install_faphub_app","args":{"app_id":"wifi_marauder","download_url":"https://.../app.fap"}}"""
+                """{"action":"install_faphub_app","args":{"app_id":"quac"}}"""
             CommandAction.PUSH_ARTIFACT ->
                 """{"action":"push_artifact","args":{"path":"/ext/file.bin","artifact_data":"<base64>"}}"""
             CommandAction.EXECUTE_CLI ->

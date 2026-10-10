@@ -26,10 +26,25 @@ data class FapApp(
     val rating: Float = 0f,
     val updatedAt: Long = 0,
     val sdkVersion: String = "0.0",
-    val targetFirmware: String = "any",
+    val targetFirmware: String = "official release",
     val isInstalled: Boolean = false,
-    val installedVersion: String? = null
+    val installedVersion: String? = null,
+    /** Flipper application catalog alias. Install resolves a real .fap from this. */
+    val catalogAlias: String = "",
+    /** Folder under /ext/apps. Matches the catalog category name, including "Sub-GHz". */
+    val installFolder: String = "Tools",
+    val pack: FapPack = FapPack.DAILY,
+    /** True when the app needs a board or wired module the stock Flipper does not have. */
+    val needsModule: Boolean = false,
 )
+
+@Serializable
+enum class FapPack(val displayName: String) {
+    @SerialName("daily") DAILY("Daily"),
+    @SerialName("radio") RADIO("Radio"),
+    @SerialName("edge") EDGE("Edge"),
+    @SerialName("play") PLAY("Play"),
+}
 
 @Serializable
 enum class FapCategory(val displayName: String, val icon: String) {
@@ -292,49 +307,110 @@ object FlipperResourceLibrary {
 }
 
 /**
- * FapHub catalog (existing curated app list)
+ * On-device pack for a stock Flipper Zero.
+ *
+ * Every entry is a real Flipper application-catalog alias. Install resolves the
+ * compiled FAP for the connected firmware's SDK. Nothing here needs a Wi-Fi
+ * board, GPS, or GPIO module.
  */
 object FapHubCatalog {
 
-    val featuredApps = listOf(
-        FapApp(id = "picopass", name = "PicoPass Reader", description = "Read and emulate iClass/PicoPass cards", category = FapCategory.NFC, author = "Flipper Team", version = "1.5", downloadUrl = "https://lab.flipper.net/apps/picopass", downloads = 50000, rating = 4.8f),
-        FapApp(id = "wifi_marauder", name = "WiFi Marauder", description = "ESP32 Marauder companion app for WiFi attacks", category = FapCategory.BLUETOOTH, author = "0xchocolate", version = "0.6.3", downloadUrl = "https://lab.flipper.net/apps/wifi_marauder", downloads = 120000, rating = 4.9f),
-        FapApp(id = "ble_spam", name = "BLE Spam", description = "Bluetooth Low Energy advertisement spam", category = FapCategory.BLUETOOTH, author = "Willy-JL", version = "2.1", downloadUrl = "https://lab.flipper.net/apps/ble_spam", downloads = 85000, rating = 4.7f),
-        FapApp(id = "mousejacker", name = "MouseJacker", description = "Exploit wireless mice and keyboards", category = FapCategory.SUBGHZ, author = "Flipper Team", version = "1.1", downloadUrl = "https://lab.flipper.net/apps/mousejacker", downloads = 45000, rating = 4.6f),
-        FapApp(id = "sentry_safe", name = "Sentry Safe Cracker", description = "Brute force Sentry Safe electronic locks", category = FapCategory.GPIO, author = "H4ckd4ddy", version = "1.0", downloadUrl = "https://lab.flipper.net/apps/sentry_safe", downloads = 30000, rating = 4.5f),
-        FapApp(id = "evil_portal", name = "Evil Portal", description = "Captive portal for credential capture", category = FapCategory.BLUETOOTH, author = "bigbrodude6119", version = "0.3", downloadUrl = "https://lab.flipper.net/apps/evil_portal", downloads = 75000, rating = 4.7f),
-        FapApp(id = "flappy_bird", name = "Flappy Bird", description = "Classic Flappy Bird game", category = FapCategory.GAMES, author = "xMasterX", version = "1.2", downloadUrl = "https://lab.flipper.net/apps/flappy_bird", downloads = 100000, rating = 4.8f),
-        FapApp(id = "doom", name = "DOOM", description = "The classic DOOM game ported to Flipper", category = FapCategory.GAMES, author = "xMasterX", version = "0.9", downloadUrl = "https://lab.flipper.net/apps/doom", downloads = 95000, rating = 4.9f),
-        FapApp(id = "tetris", name = "Tetris", description = "Classic Tetris game", category = FapCategory.GAMES, author = "Flipper Team", version = "1.0", downloadUrl = "https://lab.flipper.net/apps/tetris", downloads = 80000, rating = 4.7f),
-        FapApp(id = "snake", name = "Snake", description = "Classic Snake game", category = FapCategory.GAMES, author = "Flipper Team", version = "1.0", downloadUrl = "https://lab.flipper.net/apps/snake", downloads = 70000, rating = 4.6f),
-        FapApp(id = "nfc_magic", name = "NFC Magic", description = "Write to magic/gen1a NFC cards", category = FapCategory.NFC, author = "Flipper Team", version = "1.3", downloadUrl = "https://lab.flipper.net/apps/nfc_magic", downloads = 65000, rating = 4.8f),
-        FapApp(id = "seader", name = "Seader", description = "Read HID iClass SE cards with SAM", category = FapCategory.NFC, author = "bettse", version = "1.0", downloadUrl = "https://lab.flipper.net/apps/seader", downloads = 25000, rating = 4.5f),
-        FapApp(id = "barcode_gen", name = "Barcode Generator", description = "Generate and display barcodes", category = FapCategory.TOOLS, author = "Flipper Team", version = "1.1", downloadUrl = "https://lab.flipper.net/apps/barcode_gen", downloads = 40000, rating = 4.4f),
-        FapApp(id = "qrcode", name = "QR Code", description = "Generate and display QR codes", category = FapCategory.TOOLS, author = "Willy-JL", version = "1.5", downloadUrl = "https://lab.flipper.net/apps/qrcode", downloads = 55000, rating = 4.6f),
-        FapApp(id = "pocsag_pager", name = "POCSAG Pager", description = "Send POCSAG pager messages", category = FapCategory.SUBGHZ, author = "xMasterX", version = "0.8", downloadUrl = "https://lab.flipper.net/apps/pocsag_pager", downloads = 20000, rating = 4.3f),
-        FapApp(id = "subghz_bruteforcer", name = "Sub-GHz Bruteforcer", description = "Brute force Sub-GHz protocols", category = FapCategory.SUBGHZ, author = "xMasterX", version = "1.3", downloadUrl = "https://lab.flipper.net/apps/subghz_bruteforcer", downloads = 60000, rating = 4.7f),
-        FapApp(id = "gps", name = "GPS", description = "GPS NMEA parser with serial module", category = FapCategory.GPIO, author = "Flipper Team", version = "1.2", downloadUrl = "https://lab.flipper.net/apps/gps", downloads = 35000, rating = 4.5f),
-        FapApp(id = "signal_generator", name = "Signal Generator", description = "Generate test signals on GPIO", category = FapCategory.GPIO, author = "Flipper Team", version = "1.0", downloadUrl = "https://lab.flipper.net/apps/signal_generator", downloads = 15000, rating = 4.2f),
-        FapApp(id = "music_player", name = "Music Player", description = "Play RTTTL music files", category = FapCategory.MEDIA, author = "Flipper Team", version = "1.0", downloadUrl = "https://lab.flipper.net/apps/music_player", downloads = 50000, rating = 4.4f),
-        FapApp(id = "video_player", name = "Video Player", description = "Play video files on the display", category = FapCategory.MEDIA, author = "LTVA1", version = "0.5", downloadUrl = "https://lab.flipper.net/apps/video_player", downloads = 30000, rating = 4.3f),
-        FapApp(id = "ir_remote", name = "Universal IR Remote", description = "Comprehensive IR remote database", category = FapCategory.INFRARED, author = "Flipper Team", version = "2.0", downloadUrl = "https://lab.flipper.net/apps/ir_remote", downloads = 90000, rating = 4.8f),
-        FapApp(id = "ir_scope", name = "IR Scope", description = "Visualize and decode IR signals", category = FapCategory.INFRARED, author = "xMasterX", version = "1.1", downloadUrl = "https://lab.flipper.net/apps/ir_scope", downloads = 25000, rating = 4.4f),
-        FapApp(id = "usb_hid", name = "USB HID", description = "Advanced USB HID controller", category = FapCategory.USB, author = "Flipper Team", version = "1.5", downloadUrl = "https://lab.flipper.net/apps/usb_hid", downloads = 40000, rating = 4.5f),
-        FapApp(id = "mass_storage", name = "Mass Storage", description = "Expose SD card as USB mass storage", category = FapCategory.USB, author = "Flipper Team", version = "1.0", downloadUrl = "https://lab.flipper.net/apps/mass_storage", downloads = 55000, rating = 4.6f),
-        FapApp(id = "spectrum_analyzer", name = "Spectrum Analyzer", description = "Real-time RF spectrum visualization", category = FapCategory.SUBGHZ, author = "jolcese", version = "1.2", downloadUrl = "https://lab.flipper.net/apps/spectrum_analyzer", downloads = 45000, rating = 4.7f),
-        FapApp(id = "weather_station", name = "Weather Station", description = "Decode weather station sensors", category = FapCategory.SUBGHZ, author = "Flipper Team", version = "1.1", downloadUrl = "https://lab.flipper.net/apps/weather_station", downloads = 35000, rating = 4.4f),
-        FapApp(id = "airtag_scanner", name = "AirTag Scanner", description = "Detect nearby Apple AirTags", category = FapCategory.BLUETOOTH, author = "Willy-JL", version = "1.0", downloadUrl = "https://lab.flipper.net/apps/airtag_scanner", downloads = 60000, rating = 4.6f),
-        FapApp(id = "bt_serial", name = "Bluetooth Serial", description = "Bluetooth serial terminal", category = FapCategory.BLUETOOTH, author = "Flipper Team", version = "1.2", downloadUrl = "https://lab.flipper.net/apps/bt_serial", downloads = 30000, rating = 4.3f),
-        FapApp(id = "clock", name = "Clock", description = "Analog and digital clock faces", category = FapCategory.MISC, author = "Flipper Team", version = "1.0", downloadUrl = "https://lab.flipper.net/apps/clock", downloads = 25000, rating = 4.2f),
-        FapApp(id = "dice", name = "Dice Roller", description = "Roll various dice types", category = FapCategory.MISC, author = "Flipper Team", version = "1.0", downloadUrl = "https://lab.flipper.net/apps/dice", downloads = 20000, rating = 4.1f)
-    )
+    val featuredApps: List<FapApp> = buildList {
+        // Daily driver
+        add(packApp("quac", "Quac!", "Quick-action remote for the IR, Sub-GHz, NFC, RFID, and iButton files you already saved.", FapCategory.TOOLS, "Tools", "Roberto De Feo", "0.10.0", FapPack.DAILY))
+        add(packApp("totp", "Authenticator", "TOTP and HOTP codes on the Flipper.", FapCategory.TOOLS, "Tools", "Alexander Kopachov (@akopachov)", "5.190", FapPack.DAILY))
+        add(packApp("nfc_maker", "NFC Maker", "Build NFC files for links, contacts, Wi-Fi, and text, then emulate them from the NFC app.", FapCategory.NFC, "NFC", "@Willy-JL", "2.1", FapPack.DAILY))
+        add(packApp("subghz_remote_ofw", "Sub-GHz Remote", "Five-slot remote for .sub files you recorded.", FapCategory.SUBGHZ, "Sub-GHz", "@gid9798 and @xMasterX", "1.7", FapPack.DAILY))
+        add(packApp("barcode_app", "Barcode", "Show barcodes on the Flipper screen.", FapCategory.TOOLS, "Tools", "@Kingal1337", "1.4", FapPack.DAILY))
+        add(packApp("qrcode", "QR Code", "Show QR codes on the Flipper screen.", FapCategory.TOOLS, "Tools", "Bob Matcuk", "2.1", FapPack.DAILY))
+        add(packApp("mass_storage", "Mass Storage", "Expose a disk image on the SD card as a USB drive.", FapCategory.USB, "USB", "@nminaylov @kevinwallace", "1.5", FapPack.DAILY))
+        add(packApp("bt_trigger", "BT Trigger", "Use the Flipper as a Bluetooth camera remote for your phone.", FapCategory.BLUETOOTH, "Bluetooth", "@Nem0oo", "1.5", FapPack.DAILY))
+        add(packApp("clock", "Clock", "Simple clock face.", FapCategory.TOOLS, "Tools", "@kowalski7cc", "1.2", FapPack.DAILY))
+        add(packApp("analog_clock", "Analog Clock", "Analog clock on the Flipper screen.", FapCategory.TOOLS, "Tools", "@scrolltex", "1.4", FapPack.DAILY))
+        add(packApp("dice_app", "Dice", "Coin and polyhedral dice.", FapCategory.TOOLS, "Tools", "Flipper catalog", "1.3", FapPack.DAILY))
+        add(packApp("flipp_pomodoro", "Pomodoro", "Pomodoro timer.", FapCategory.TOOLS, "Tools", "@Th3Un1q3", "1.5", FapPack.DAILY))
+        add(packApp("lightmeter", "Lightmeter", "Photography light meter using the built-in light sensor.", FapCategory.TOOLS, "Tools", "Oleksii Kutuzov", "1.3", FapPack.DAILY))
+        add(packApp("animation_switcher", "Animation Switcher", "Swap the desktop dolphin animation from the SD card.", FapCategory.TOOLS, "Tools", "@lsalik2", "1.1", FapPack.DAILY))
+        add(packApp("music_player", "Music Player", "Play RTTTL tunes on the speaker.", FapCategory.MEDIA, "Media", "@DrZlo13", "1.4", FapPack.DAILY))
+        add(packApp("wav_player", "WAV Player", "Play WAV files on the speaker.", FapCategory.MEDIA, "Media", "@DrZlo13", "1.4", FapPack.DAILY))
 
-    val allApps: List<FapApp> get() = featuredApps.sortedByDescending { it.downloads }
+        // Radio bench — built-in CC1101 and IR only
+        add(packApp("protoview", "ProtoView", "Draw unknown Sub-GHz pulses, edit them, and replay a capture.", FapCategory.SUBGHZ, "Sub-GHz", "@antirez", "1.3", FapPack.RADIO))
+        add(packApp("spectrum_analyzer", "Spectrum Analyzer", "Live spectrogram of the bands the internal radio can hear.", FapCategory.SUBGHZ, "Sub-GHz", "@jolcese, @xMasterX", "1.4", FapPack.RADIO))
+        add(packApp("weather_station", "Weather Station", "Receive outdoor weather sensors on Sub-GHz.", FapCategory.SUBGHZ, "Sub-GHz", "@Skorpionm", "2.0", FapPack.RADIO))
+        add(packApp("pocsag_pager", "POCSAG Pager", "Capture POCSAG 1200 pager bursts on the internal radio.", FapCategory.SUBGHZ, "Sub-GHz", "@xMasterX, @Shmuma", "1.4", FapPack.RADIO))
+        add(packApp("ir_scope", "IR Scope", "Watch incoming infrared signals.", FapCategory.INFRARED, "Infrared", "@kallanreed", "1.4", FapPack.RADIO))
+
+        // Sharp tools that still run on the bare device
+        add(packApp("nfc_magic", "NFC Magic", "Write NFC tags whose sector 0 can be changed.", FapCategory.NFC, "NFC", "@AloneLiberty", "1.15", FapPack.EDGE))
+        add(packApp("picopass", "PicoPass", "Talk to PicoPass / iClass tags with the built-in NFC radio.", FapCategory.NFC, "NFC", "@bettse", "1.22", FapPack.EDGE))
+        add(packApp("metroflip", "Metroflip", "Read a transit card you are holding.", FapCategory.NFC, "NFC", "luu176", "2.0", FapPack.EDGE))
+        add(packApp("weebo", "Weebo", "NTAG215 parser, writer, and emulator.", FapCategory.NFC, "NFC", "bettse", "0.5", FapPack.EDGE))
+        add(packApp("mouse_jiggler", "Mouse Jiggler", "USB mouse jiggler for a computer you plug the Flipper into.", FapCategory.USB, "USB", "David Berdik", "1.1", FapPack.EDGE))
+        add(packApp("findmy", "FindMy Flipper", "BLE Find My beacon so you can locate this Flipper.", FapCategory.BLUETOOTH, "Bluetooth", "@MatthewKuKanich", "3.0", FapPack.EDGE))
+        add(packApp("cyborg_detector", "Cyborg Detector", "Hold an NFC field so compatible implant LEDs light up.", FapCategory.NFC, "NFC", "@RocketGod-git", "1.1", FapPack.EDGE))
+
+        // Screen and speaker
+        add(packApp("doom", "DOOM", "DOOM on the Flipper screen.", FapCategory.GAMES, "Games", "@p4nic4ttack, @xMasterX", "1.5", FapPack.PLAY))
+        add(packApp("tetris", "Tetris", "Tetris.", FapCategory.GAMES, "Games", "@jeffplang, @xMasterX", "1.5", FapPack.PLAY))
+        add(packApp("snake20", "Snake", "Snake.", FapCategory.GAMES, "Games", "@Willzvul", "2.4", FapPack.PLAY))
+        add(packApp("flappy_bird", "Flappy Bird", "Flappy Bird.", FapCategory.GAMES, "Games", "@DroomOne", "1.3", FapPack.PLAY))
+        add(packApp("asteroids", "Asteroids", "Asteroids.", FapCategory.GAMES, "Games", "@SimplyMinimal", "1.2", FapPack.PLAY))
+        add(packApp("zombiez", "Zombiez", "Defend the wall.", FapCategory.GAMES, "Games", "@DevMilanIan", "1.3", FapPack.PLAY))
+        add(packApp("video_player", "Video Player", "Play a video on the Flipper screen.", FapCategory.MEDIA, "Media", "LTVA", "0.4", FapPack.PLAY))
+        add(packApp("image_viewer", "Image Viewer", "Show pictures on the Flipper screen.", FapCategory.MEDIA, "Media", "@polioan", "0.1", FapPack.PLAY))
+        add(packApp("usb_midi", "USB-MIDI", "Turn the Flipper into a USB MIDI controller.", FapCategory.USB, "USB", "@Kribesk", "1.0", FapPack.PLAY))
+    }
+
+    val allApps: List<FapApp> get() = featuredApps
+
+    /** Apps that run with only the Flipper Zero. */
+    val bareApps: List<FapApp> get() = featuredApps.filter { !it.needsModule }
+
+    fun appsInPack(pack: FapPack): List<FapApp> = featuredApps.filter { it.pack == pack }
 
     fun getAppsByCategory(category: FapCategory): List<FapApp> = featuredApps.filter { it.category == category }
 
-    fun searchApps(query: String): List<FapApp> {
-        val lq = query.lowercase()
-        return featuredApps.filter { it.name.lowercase().contains(lq) || it.description.lowercase().contains(lq) || it.author.lowercase().contains(lq) }
+    fun installPath(app: FapApp): String {
+        val fileName = app.catalogAlias.ifBlank { app.id }
+        return "/ext/apps/${app.installFolder}/$fileName.fap"
     }
+
+    fun searchApps(query: String): List<FapApp> {
+        val lq = query.lowercase().trim()
+        if (lq.isEmpty()) return featuredApps
+        return featuredApps.filter {
+            it.name.lowercase().contains(lq) ||
+                it.description.lowercase().contains(lq) ||
+                it.author.lowercase().contains(lq) ||
+                it.id.lowercase().contains(lq) ||
+                it.catalogAlias.lowercase().contains(lq) ||
+                it.pack.displayName.lowercase().contains(lq) ||
+                it.pack.name.lowercase().contains(lq)
+        }
+    }
+
+    private fun packApp(
+        alias: String,
+        name: String,
+        description: String,
+        category: FapCategory,
+        installFolder: String,
+        author: String,
+        version: String,
+        pack: FapPack,
+    ): FapApp = FapApp(
+        id = alias,
+        catalogAlias = alias,
+        name = name,
+        description = description,
+        category = category,
+        author = author,
+        version = version,
+        downloadUrl = "https://catalog.flipperzero.one/api/v0/0/application?limit=500",
+        installFolder = installFolder,
+        pack = pack,
+        needsModule = false,
+        targetFirmware = "official release SDK",
+    )
 }

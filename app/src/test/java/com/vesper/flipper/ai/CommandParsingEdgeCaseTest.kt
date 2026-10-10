@@ -249,7 +249,10 @@ class CommandParsingEdgeCaseTest {
         val unwrapped = when {
             argsElement is JsonArray && argsElement.size == 1 && argsElement[0] is JsonObject ->
                 argsElement[0] as JsonObject
-            else -> fail("Should have unwrapped single-element array")
+            else -> {
+                fail("Should have unwrapped single-element array")
+                throw AssertionError("Should have unwrapped single-element array")
+            }
         }
         assertEquals("/ext/nfc", unwrapped["path"]?.jsonPrimitive?.content)
     }
@@ -259,7 +262,10 @@ class CommandParsingEdgeCaseTest {
         val argsElement: JsonElement = JsonArray(emptyList())
         val result = when {
             argsElement is JsonArray && argsElement.isEmpty() -> JsonObject(emptyMap())
-            else -> fail("Should have produced empty JsonObject")
+            else -> {
+                fail("Should have produced empty JsonObject")
+                throw AssertionError("Should have produced empty JsonObject")
+            }
         }
         assertTrue(result.isEmpty())
     }

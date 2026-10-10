@@ -39,6 +39,8 @@ fun FapHubScreen(
     val activeTab by viewModel.activeTab.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val selectedCategory by viewModel.selectedCategory.collectAsState()
+    val selectedPack by viewModel.selectedPack.collectAsState()
+    val packProgress by viewModel.packProgress.collectAsState()
     val sortBy by viewModel.sortBy.collectAsState()
     val displayedApps by viewModel.displayedApps.collectAsState()
     val installStatus by viewModel.installStatus.collectAsState()
@@ -77,7 +79,7 @@ fun FapHubScreen(
                             Text("ARSENAL", modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp), style = MaterialTheme.typography.labelSmall, color = VesperOrange, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                         }
                     }
-                    Text("Flipper App Hub and resource libraries • ${installedApps.size} installed", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    Text("Bare Flipper pack • ${FapHubCatalog.bareApps.size} apps • ${installedApps.size} on device", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                 }
                 IconButton(onClick = { viewModel.refresh() }) {
                     Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = VesperOrange)
@@ -117,6 +119,10 @@ fun FapHubScreen(
                     onSearchChange = { viewModel.updateSearchQuery(it) },
                     selectedCategory = selectedCategory,
                     onCategorySelect = { viewModel.selectCategory(it) },
+                    selectedPack = selectedPack,
+                    onPackSelect = { viewModel.selectPack(it) },
+                    packProgress = packProgress,
+                    onInstallPack = { viewModel.installPack(it) },
                     categoryCounts = categoryCounts,
                     sortBy = sortBy,
                     showSortMenu = showSortMenu,
@@ -171,6 +177,10 @@ private fun AppsTabContent(
     onSearchChange: (String) -> Unit,
     selectedCategory: FapCategory?,
     onCategorySelect: (FapCategory?) -> Unit,
+    selectedPack: FapPack?,
+    onPackSelect: (FapPack?) -> Unit,
+    packProgress: String?,
+    onInstallPack: (FapPack?) -> Unit,
     categoryCounts: Map<FapCategory, Int>,
     sortBy: SortOption,
     showSortMenu: Boolean,
@@ -194,6 +204,43 @@ private fun AppsTabContent(
             colors = OutlinedTextFieldDefaults.colors(unfocusedBorderColor = MaterialTheme.colorScheme.outline, focusedBorderColor = VesperOrange),
             shape = RoundedCornerShape(12.dp)
         )
+
+        LazyRow(modifier = Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(horizontal = 16.dp)) {
+            item {
+                FilterChip(
+                    selected = selectedPack == null,
+                    onClick = { onPackSelect(null) },
+                    label = { Text("All bare") },
+                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = VesperOrange, selectedLabelColor = Color.White)
+                )
+            }
+            items(FapPack.entries) { pack ->
+                FilterChip(
+                    selected = selectedPack == pack,
+                    onClick = { onPackSelect(if (selectedPack == pack) null else pack) },
+                    label = { Text("${pack.displayName} (${FapHubCatalog.appsInPack(pack).size})") },
+                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = VesperOrange, selectedLabelColor = Color.White)
+                )
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                packProgress ?: if (selectedPack == null) "Stock Flipper, no extra boards" else "${selectedPack.displayName} pack",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.Gray,
+                modifier = Modifier.weight(1f)
+            )
+            TextButton(onClick = { onInstallPack(selectedPack) }, enabled = packProgress == null) {
+                Icon(Icons.Default.Download, null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(if (selectedPack == null) "Install all" else "Install pack")
+            }
+        }
 
         LazyRow(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(horizontal = 16.dp)) {
             item {
@@ -465,11 +512,10 @@ private fun FapAppCard(app: FapApp, installStatus: InstallStatus?, onInstall: ()
                 }
                 Text(app.description, style = MaterialTheme.typography.bodySmall, color = Color.Gray, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Spacer(modifier = Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("by ${app.author}", style = MaterialTheme.typography.labelSmall, color = VesperOrange)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(app.pack.displayName, style = MaterialTheme.typography.labelSmall, color = VesperOrange)
                     Text("v${app.version}", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                    Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.Download, null, modifier = Modifier.size(12.dp), tint = Color.Gray); Spacer(modifier = Modifier.width(2.dp)); Text(formatDownloads(app.downloads), style = MaterialTheme.typography.labelSmall, color = Color.Gray) }
-                    Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.Star, null, modifier = Modifier.size(12.dp), tint = VesperGold); Spacer(modifier = Modifier.width(2.dp)); Text(String.format(java.util.Locale.US, "%.1f", app.rating), style = MaterialTheme.typography.labelSmall, color = Color.Gray) }
+                    Text("Bare", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
                 }
             }
             Spacer(modifier = Modifier.width(8.dp))
@@ -503,9 +549,9 @@ private fun AppDetailSheet(app: FapApp, installStatus: InstallStatus?, onInstall
                     Text(app.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = Color.White)
                     Text("by ${app.author}", style = MaterialTheme.typography.bodyMedium, color = VesperOrange)
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(top = 8.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.Download, null, modifier = Modifier.size(14.dp), tint = Color.Gray); Spacer(modifier = Modifier.width(4.dp)); Text(formatDownloads(app.downloads), style = MaterialTheme.typography.bodySmall, color = Color.Gray) }
-                        Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.Star, null, modifier = Modifier.size(14.dp), tint = Color.Gray); Spacer(modifier = Modifier.width(4.dp)); Text(String.format(java.util.Locale.US, "%.1f", app.rating), style = MaterialTheme.typography.bodySmall, color = Color.Gray) }
-                        Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.Code, null, modifier = Modifier.size(14.dp), tint = Color.Gray); Spacer(modifier = Modifier.width(4.dp)); Text("v${app.version}", style = MaterialTheme.typography.bodySmall, color = Color.Gray) }
+                        Text(app.pack.displayName, style = MaterialTheme.typography.bodySmall, color = VesperOrange)
+                        Text("v${app.version}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                        Text("Bare Flipper", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                     }
                 }
             }
@@ -513,6 +559,8 @@ private fun AppDetailSheet(app: FapApp, installStatus: InstallStatus?, onInstall
             Text("About", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
             Spacer(modifier = Modifier.height(8.dp))
             Text(app.description, style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(FapHubCatalog.installPath(app), style = MaterialTheme.typography.bodySmall, color = Color.Gray)
             Spacer(modifier = Modifier.height(24.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Column { Text("Category", style = MaterialTheme.typography.labelMedium, color = Color.Gray); Text("${app.category.icon} ${app.category.displayName}", style = MaterialTheme.typography.bodyMedium, color = Color.White) }
@@ -538,5 +586,4 @@ private fun getCategoryColor(category: FapCategory): Color = when (category) {
     FapCategory.BLUETOOTH -> Color(0xFF2196F3); FapCategory.USB -> Color(0xFF607D8B); FapCategory.MEDIA -> Color(0xFFE91E63); FapCategory.MISC -> Color(0xFF795548)
 }
 
-private fun formatDownloads(count: Int): String = when { count >= 1_000_000 -> String.format(java.util.Locale.US, "%.1fM", count / 1_000_000f); count >= 1_000 -> String.format(java.util.Locale.US, "%.1fK", count / 1_000f); else -> count.toString() }
 private fun formatStars(count: Int): String = when { count >= 1000 -> String.format(java.util.Locale.US, "%.1fK", count / 1000f); else -> count.toString() }

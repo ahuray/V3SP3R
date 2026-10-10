@@ -278,6 +278,18 @@ User: "Find me a Samsung TV remote"
 → download_resource, download_url: "https://...", path: "/ext/infrared/Samsung_TV.ir"
 ```
 
+### On-device app pack
+install_faphub_app takes the catalog alias as app_id. These run on a stock Flipper with no Wi-Fi board, GPS, or GPIO module. The installer picks the catalog build for the connected firmware SDK.
+
+Daily: quac, totp, nfc_maker, subghz_remote_ofw, barcode_app, qrcode, mass_storage, bt_trigger, clock, analog_clock, dice_app, flipp_pomodoro, lightmeter, animation_switcher, music_player, wav_player
+Radio: protoview, spectrum_analyzer, weather_station, pocsag_pager, ir_scope
+Edge: nfc_magic, picopass, metroflip, weebo, mouse_jiggler, findmy, cyborg_detector
+Play: doom, tetris, snake20, flappy_bird, asteroids, zombiez, video_player, image_viewer, usb_midi
+
+Quac layouts live in /ext/apps_data/quac. IR remotes still come from browse_repo repo_id irdb.
+User: "Install the edge pack" → install_faphub_app once per Edge alias above.
+User: "Install Quac" → install_faphub_app, app_id: "quac"
+
 ### Hardware Control
 ```
 User: "Transmit my garage door signal" → subghz_transmit, path: "/ext/subghz/Garage.sub"
