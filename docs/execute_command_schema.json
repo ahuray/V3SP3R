@@ -1,0 +1,219 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "execute_command",
+  "description": "Execute a command on the Flipper Zero device. All file operations, device queries, hardware control, and artifact pushes go through this interface.",
+  "type": "object",
+  "properties": {
+    "action": {
+      "type": "string",
+      "enum": [
+        "list_directory",
+        "read_file",
+        "write_file",
+        "create_directory",
+        "delete",
+        "move",
+        "rename",
+        "copy",
+        "get_device_info",
+        "get_storage_info",
+        "execute_cli",
+        "push_artifact",
+        "forge_payload",
+        "subghz_transmit",
+        "ir_transmit",
+        "nfc_emulate",
+        "rfid_emulate",
+        "ibutton_emulate",
+        "badusb_execute",
+        "launch_app",
+        "led_control",
+        "vibro_control",
+        "search_faphub",
+        "install_faphub_app",
+        "browse_repo",
+        "download_resource",
+        "github_search",
+        "request_photo"
+      ],
+      "description": "The action to perform on the Flipper Zero"
+    },
+    "args": {
+      "type": "object",
+      "description": "Arguments for the action (varies by action type)",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "File or directory path on Flipper (e.g., /ext/subghz/garage.sub)"
+        },
+        "destination_path": {
+          "type": "string",
+          "description": "Destination path for move/copy operations"
+        },
+        "content": {
+          "type": "string",
+          "description": "Content to write to file (for write_file action)"
+        },
+        "new_name": {
+          "type": "string",
+          "description": "New name for rename operation"
+        },
+        "recursive": {
+          "type": "boolean",
+          "description": "Whether to delete recursively (for delete action)",
+          "default": false
+        },
+        "artifact_type": {
+          "type": "string",
+          "enum": ["fap", "config", "data", "executable"],
+          "description": "Type of artifact being pushed"
+        },
+        "artifact_data": {
+          "type": "string",
+          "description": "Base64-encoded artifact data (for push_artifact action)"
+        },
+        "command": {
+          "type": "string",
+          "description": "CLI command to execute on the Flipper (for execute_cli action)"
+        },
+        "payload_type": {
+          "type": "string",
+          "enum": ["subghz", "ir", "badusb", "nfc"],
+          "description": "Type of payload to generate (for forge_payload action)"
+        },
+        "payload_spec": {
+          "type": "string",
+          "description": "Natural language or structured specification for payload generation"
+        },
+        "frequency": {
+          "type": "number",
+          "description": "Frequency in Hz for SubGHz operations"
+        },
+        "protocol": {
+          "type": "string",
+          "description": "Protocol name for SubGHz/IR/NFC operations"
+        },
+        "signal_file": {
+          "type": "string",
+          "description": "Path to signal file on Flipper for transmit/emulate actions"
+        },
+        "script": {
+          "type": "string",
+          "description": "BadUSB script content (for badusb_execute action)"
+        },
+        "app_name": {
+          "type": "string",
+          "description": "Application name (for launch_app action)"
+        },
+        "color": {
+          "type": "string",
+          "enum": ["red", "green", "blue", "backlight"],
+          "description": "LED color (for led_control action)"
+        },
+        "state": {
+          "type": "boolean",
+          "description": "On/off state for LED or vibro control"
+        },
+        "query": {
+          "type": "string",
+          "description": "Search query for FapHub, GitHub, or resource browsing"
+        },
+        "app_id": {
+          "type": "string",
+          "description": "FapHub application ID (for install_faphub_app action)"
+        },
+        "repo_url": {
+          "type": "string",
+          "description": "GitHub repository URL (for browse_repo action)"
+        },
+        "resource_url": {
+          "type": "string",
+          "description": "URL of resource to download (for download_resource action)"
+        }
+      }
+    },
+    "justification": {
+      "type": "string",
+      "description": "Explanation of why this action is being taken"
+    },
+    "expected_effect": {
+      "type": "string",
+      "description": "What you expect this action to accomplish"
+    }
+  },
+  "required": ["action", "args", "justification", "expected_effect"],
+  "examples": [
+    {
+      "action": "list_directory",
+      "args": {
+        "path": "/ext/subghz"
+      },
+      "justification": "User wants to see their SubGHz captures",
+      "expected_effect": "Return a list of .sub files in the SubGHz directory"
+    },
+    {
+      "action": "read_file",
+      "args": {
+        "path": "/ext/subghz/garage.sub"
+      },
+      "justification": "User wants to inspect the garage remote configuration",
+      "expected_effect": "Return the contents of the garage.sub file"
+    },
+    {
+      "action": "write_file",
+      "args": {
+        "path": "/ext/subghz/garage.sub",
+        "content": "Filetype: Flipper SubGhz Key File\nVersion: 1\nFrequency: 315000000\n..."
+      },
+      "justification": "User wants to change the frequency from 390MHz to 315MHz",
+      "expected_effect": "Update the garage.sub file with the new frequency"
+    },
+    {
+      "action": "subghz_transmit",
+      "args": {
+        "signal_file": "/ext/subghz/garage.sub"
+      },
+      "justification": "User wants to transmit the garage signal",
+      "expected_effect": "Transmit the SubGHz signal stored in garage.sub"
+    },
+    {
+      "action": "execute_cli",
+      "args": {
+        "command": "info"
+      },
+      "justification": "User wants detailed system information from the Flipper",
+      "expected_effect": "Return system info output from the Flipper CLI"
+    },
+    {
+      "action": "launch_app",
+      "args": {
+        "app_name": "Sub-GHz"
+      },
+      "justification": "User wants to open the SubGHz app on the Flipper",
+      "expected_effect": "Launch the Sub-GHz application on the Flipper Zero"
+    },
+    {
+      "action": "led_control",
+      "args": {
+        "color": "green",
+        "state": true
+      },
+      "justification": "User wants visual feedback from the Flipper",
+      "expected_effect": "Turn on the green LED on the Flipper Zero"
+    },
+    {
+      "action": "search_faphub",
+      "args": {
+        "query": "wifi scanner"
+      },
+      "justification": "User is looking for a WiFi scanning app",
+      "expected_effect": "Return matching applications from the FapHub catalog"
+    },
+    {
+      "action": "get_device_info",
+      "args": {},
+      "justification": "User wants to check device status",
+      "expected_effect": "Return battery level, firmware version, and hardware info"
+    }
+  ]
+}
