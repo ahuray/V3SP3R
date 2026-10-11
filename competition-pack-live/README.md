@@ -16,6 +16,7 @@ sacrificial laptop, and the restore checklist staged. No gate, no demo.
 | Path | What it is |
 | --- | --- |
 | `payloads/live_wifi_key_reveal_windows.txt` | BadUSB: `netsh ... key=clear` prints the saved lab WiFi password on the laptop screen. Display only; `LAB_SSID_HERE` placeholder must be edited first. |
+| `payloads/live_wifi_key_reveal_elevated_windows.txt` | Elevated fallback of the same reveal for Windows builds that demand admin rights for `key=clear` (UAC consent via keyboard; needs a local-admin demo account). Rehearse both, keep the one that works. |
 | `payloads/live_credential_prompt_windows.txt` | BadUSB: fake `LabGuest WiFi` sign-in prompt; shows only the typed username. The password is discarded by construction. |
 | `payloads/live_hackertyper_windows.txt` | BadUSB: opens hackertyper.net fullscreen. Comic beat, zero impact. |
 | `evilportal/index.html` | Captive-portal phish demo page for the Marauder evil portal on the lab AP. Test credentials only; captures land on the lab SD card and are deleted on stage. |
@@ -28,8 +29,8 @@ sacrificial laptop, and the restore checklist staged. No gate, no demo.
   device (no network calls, redirects, file writes, or messaging).
 - No downloads, no encoded commands, no persistence, no registry/scheduled
   task/service changes, no destructive commands, no hidden windows.
-- The netsh payload fires only after `LAB_SSID_HERE` is replaced with the lab
-  SSID, and it is display-only.
+- The netsh payloads (plain and elevated fallback) fire only after
+  `LAB_SSID_HERE` is replaced with the lab SSID, and they are display-only.
 - The credential prompt discards the password by construction; only the
   username is echoed.
 - URLs in payloads are allowlisted; today the only allowed URL is

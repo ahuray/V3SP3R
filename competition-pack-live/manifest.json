@@ -22,6 +22,12 @@
         },
         {
           "type": "file",
+          "path": "payloads/live_wifi_key_reveal_elevated_windows.txt",
+          "target": "/ext/badusb/live_wifi_key_reveal_elevated_windows.txt",
+          "role": "Elevated fallback for the key reveal when Windows demands admin rights for key=clear. UAC consent via the keyboard; needs a local-admin demo account, which is itself a talking point. Rehearse both variants and keep the one that works. Display-only."
+        },
+        {
+          "type": "file",
           "path": "payloads/live_credential_prompt_windows.txt",
           "target": "/ext/badusb/live_credential_prompt_windows.txt",
           "role": "Pop a LabGuest sign-in prompt on the sacrificial laptop, then show only the typed username on screen. The password is discarded by construction."

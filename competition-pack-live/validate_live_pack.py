@@ -48,6 +48,8 @@ URL_RE = re.compile(r"https?://[^\s\"')<>]+")
 FORM_ACTION_RE = re.compile(r'action="([^"]*)"')
 
 WIFI_PAYLOAD = "live_wifi_key_reveal_windows.txt"
+WIFI_ELEVATED_PAYLOAD = "live_wifi_key_reveal_elevated_windows.txt"
+NETSH_PAYLOADS = {WIFI_PAYLOAD, WIFI_ELEVATED_PAYLOAD}
 CRED_PAYLOAD = "live_credential_prompt_windows.txt"
 LAB_SSID_PLACEHOLDER = 'name="LAB_SSID_HERE"'
 NETSH_LINE = 'STRING netsh wlan show profile name="LAB_SSID_HERE" key=clear'
@@ -515,7 +517,7 @@ def check_payloads() -> list[tuple[bool, str]]:
     for name, text in texts.items():
         display = f"payloads/{name}"
         lines = command_lines(text)
-        if name == WIFI_PAYLOAD:
+        if name in NETSH_PAYLOADS:
             netsh_lines = [line for line in lines if "netsh" in line.lower()]
             if netsh_lines != [NETSH_LINE]:
                 results.append(
@@ -534,7 +536,8 @@ def check_payloads() -> list[tuple[bool, str]]:
                     (True, f"{display}: netsh scoped to placeholder lab SSID")
                 )
         elif "netsh" in text.lower():
-            results.append((False, f"{display}: netsh is only allowed in {WIFI_PAYLOAD}"))
+            allowed = ", ".join(sorted(NETSH_PAYLOADS))
+            results.append((False, f"{display}: netsh is only allowed in {allowed}"))
 
         if name == CRED_PAYLOAD:
             ps_lines = [line for line in lines if "powershell" in line.lower()]

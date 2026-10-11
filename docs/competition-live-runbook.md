@@ -45,6 +45,7 @@ Install of the live payloads is the same SD-card copy as the safe assets (instal
 | Repo file | Flipper path | Role |
 | --- | --- | --- |
 | `competition-pack-live/payloads/live_wifi_key_reveal_windows.txt` | `/ext/badusb/live_wifi_key_reveal_windows.txt` | D1. Opens `cmd` and runs the `netsh` line below. Edit `LAB_SSID_HERE` to the lab SSID before the demo. No exfiltration. Nothing written to disk. |
+| `competition-pack-live/payloads/live_wifi_key_reveal_elevated_windows.txt` | `/ext/badusb/live_wifi_key_reveal_elevated_windows.txt` | D1 fallback. Elevated `cmd` via UAC consent for Windows builds that demand admin rights for `key=clear`. Needs a local-admin demo account — if it works, say so, that is a finding. Rehearse both variants; keep the working one on the SD. |
 | `competition-pack-live/payloads/live_credential_prompt_windows.txt` | `/ext/badusb/live_credential_prompt_windows.txt` | D1. Native Windows credential dialog via PowerShell `Get-Credential`. Message text: `LabGuest WiFi Sign-in`. The message box echoes only the typed username. The password is never shown or stored. |
 | `competition-pack-live/payloads/live_hackertyper_windows.txt` | `/ext/badusb/live_hackertyper_windows.txt` | D1 optional laugh beat. Opens hackertyper.net. |
 | `competition-pack-live/evilportal/index.html` | `/ext/apps_data/evil_portal/index.html` (TODO(verify) against the flashed Marauder build) | D5 captive portal. Generic "LabGuest WiFi" branding. Test credentials only. |
@@ -80,6 +81,7 @@ Each station keeps the safe runbook's shape: red, then the blue countermeasure, 
 
 - The authorization record lists D1 live (key reveal and credential prompt). List the hackertyper beat on its own line if it will run.
 - `LAB_SSID_HERE` in `live_wifi_key_reveal_windows.txt` has been edited to the lab SSID. The demo account is signed in on the sacrificial laptop, and that SSID's profile is saved on it.
+- Rehearsal on the actual demo laptop picked the key-reveal variant: run the `netsh` line once by hand. If Windows answers that `key=clear` needs elevation (seen on some Windows 11 builds), the elevated variant (`live_wifi_key_reveal_elevated_windows.txt`, UAC consent, local admin) is the one that goes on the SD.
 - The person who will answer the credential dialog has been briefed and will type only the test account.
 - The laptop is the sacrificial asset on the bench card. Other laptops are locked or out of reach of the cable.
 - The USB device-control blue beat from the safe runbook still follows (policy image or lab policy ready).
