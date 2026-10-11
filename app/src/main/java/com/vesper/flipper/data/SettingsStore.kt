@@ -236,6 +236,19 @@ class SettingsStore @Inject constructor(
         }
     }
 
+    private val MOUNTED_ACCESSORIES = stringSetPreferencesKey("mounted_accessories")
+
+    val mountedAccessoryIds: Flow<Set<String>> = context.dataStore.data.map { preferences ->
+        preferences[MOUNTED_ACCESSORIES] ?: emptySet()
+    }
+
+    suspend fun setAccessoryMounted(id: String, mounted: Boolean) {
+        context.dataStore.edit { preferences ->
+            val current = preferences[MOUNTED_ACCESSORIES] ?: emptySet()
+            preferences[MOUNTED_ACCESSORIES] = if (mounted) current + id else current - id
+        }
+    }
+
     // Dark mode
     private val DARK_MODE = booleanPreferencesKey("dark_mode")
 

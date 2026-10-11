@@ -359,7 +359,7 @@ private fun ResourceRepoCard(
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("by ${repo.author}", style = MaterialTheme.typography.labelSmall, color = VesperOrange)
                         Surface(color = Color(repo.resourceType.color).copy(alpha = 0.2f), shape = RoundedCornerShape(4.dp)) {
-                            Text(repo.resourceType.displayName, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), style = MaterialTheme.typography.labelSmall, color = Color(repo.resourceType.color), fontSize = 10.sp)
+                            Text(repo.resourceType.displayName, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), style = MaterialTheme.typography.labelSmall, color = Color(repo.resourceType.color))
                         }
                     }
                 }
@@ -390,12 +390,12 @@ private fun ResourceRepoCard(
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     items(repo.tags.take(5)) { tag ->
                         Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(4.dp)) {
-                            Text(tag, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, color = Color.Gray, fontSize = 10.sp)
+                            Text(tag, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, color = Color.Gray)
                         }
                     }
                     if (repo.tags.size > 5) {
                         item {
-                            Text("+${repo.tags.size - 5} more", modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp)
+                            Text("+${repo.tags.size - 5} more", modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }

@@ -523,6 +523,24 @@ class FlipperProtocol @Inject constructor() {
         sendRpcMoveLocked(sourcePath, destPath) ?: bleLegacyBlocked("move") ?: sendLegacyMoveLocked(sourcePath, destPath)
     }
 
+    suspend fun rebootOs(): ProtocolResponse = withCommandLock(
+        operation = "reboot",
+        onTimeout = { ProtocolResponse.Error("Command pipeline busy while restarting the Flipper") }
+    ) {
+        if (!ensureRpcAvailableLocked("RPC ping responded for reboot")) {
+            return@withCommandLock ProtocolResponse.Error("RPC is not available for reboot")
+        }
+        sendRpcMainAndAwaitResponse(timeoutMs = 1_500L, allowRetry = false) {
+            setSystemRebootRequest(
+                PBSystem.RebootRequest.newBuilder()
+                    .setMode(PBSystem.RebootRequest.RebootMode.OS)
+                    .build()
+            )
+        }
+        // The Flipper often drops the link before it answers.
+        ProtocolResponse.Success("Restarting the Flipper")
+    }
+
     suspend fun getDeviceInfo(): ProtocolResponse = withCommandLock(
         operation = "get device info",
         onTimeout = { ProtocolResponse.Error("Command pipeline busy while requesting device info") }

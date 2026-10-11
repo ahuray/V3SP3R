@@ -520,7 +520,7 @@ private fun EvilPortalTab(viewModel: PayloadLabViewModel) {
                                 .verticalScroll(rememberScrollState())
                                 .horizontalScroll(rememberScrollState()),
                             fontFamily = FontFamily.Monospace,
-                            fontSize = 10.sp,
+                            style = MaterialTheme.typography.bodySmall,
                             color = Color(0xFFCE9178)
                         )
                     }

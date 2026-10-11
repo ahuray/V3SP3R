@@ -101,6 +101,14 @@ class FlipperFileSystem @Inject constructor(
         }
     }
 
+    suspend fun rebootOs(): Result<Unit> {
+        return when (val response = protocol.rebootOs()) {
+            is ProtocolResponse.Success -> Result.success(Unit)
+            is ProtocolResponse.Error -> Result.failure(FlipperException(response.message, response.code))
+            else -> Result.failure(FlipperException("Unexpected response type"))
+        }
+    }
+
     suspend fun writeFileBytes(path: String, content: ByteArray): Result<Long> {
         return try {
             val validPath = securityUtils.validatePath(path)

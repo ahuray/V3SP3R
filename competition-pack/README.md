@@ -1,5 +1,7 @@
 # V3SP3R Security Competition Pack
 
+Demo assets for the lab. The product manual is [../docs/guide.md](../docs/guide.md).
+
 Internal lab pack for the company red-team / blue-team Flipper Zero exercise. Catalog apps are installed by V3SP3R from [catalog.flipperzero.one](https://catalog.flipperzero.one). The files in this tree are the demo assets pushed to the Flipper SD card (`/ext/badusb`, `/ext/subghz`, `/ext/infrared`). NFC notes live in `nfc/`; badge dumps do not.
 
 Firmware target: Unleashed, SDK API major 88. The loader compares API major only, so a catalog build with the same major as the device-reported SDK API is the one to install.

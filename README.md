@@ -11,7 +11,9 @@
 
 > **Talk to your Flipper Zero like it's your partner-in-hacking.** Vesper turns your pocket hacking tool into an AI-powered command center — controlled entirely through natural language from your Android device or smart glasses.
 
-No menus. No manuals. Just natural language prompting.
+Chat is the main way in. The other screens are there when you want them. The map is [docs/guide.md](docs/guide.md).
+
+**Start here.** [Guide](docs/guide.md) is the map of every screen. [AGENTS.md](AGENTS.md) is the same map for a coding agent, plus how to build and what not to break. [Architecture](docs/architecture.md) is how the layers fit.
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
 [![Android](https://img.shields.io/badge/Android-8.0%2B-green.svg)](https://developer.android.com)
@@ -87,11 +89,15 @@ Find and download community resources:
 - Search GitHub for Flipper-compatible files
 - Browse repositories and download directly to your Flipper
 
-### Device Manager
-Full Flipper visibility:
-- Battery, storage, firmware info, and connection status
-- Scan, pair, and manage BLE connections
-- Direct file browsing and management
+### Device
+Two tabs, Flipper and Accessories.
+
+On Flipper, while connected: the live LCD, a pause switch that keeps the last frame in place, remote buttons, the tool kit, and the passport (mood, portrait, idle animation). The passport name is the hardware name.
+
+On Accessories: official boards are the Wi-Fi Developer Board, the Video Game Module, and the Prototyping Boards. Unofficial boards, including 5Ghost, stay hidden until that switch is on. Nothing is mounted until you mark it, and a marked board is described only while the Flipper is connected.
+
+### Stage Remote
+Safe and live demo beats. Live beats ask before they run. Push the files, then run a beat from the phone.
 
 ### Risk & Permissions Engine
 Every AI action is classified before execution:
@@ -106,7 +112,6 @@ Configure **auto-approve** per risk tier in Settings to move faster when you tru
 Every action the AI takes is logged:
 - Full history of commands, results, and approvals
 - Filterable by action type and session
-- Exportable for compliance and review
 
 ---
 
@@ -150,7 +155,7 @@ Vesper works with any model on [OpenRouter](https://openrouter.ai). For the best
 ### 3. Build & Install
 
 ```bash
-git clone https://github.com/elder-plinius/V3SP3R.git
+git clone <repository-url>
 cd V3SP3R
 ```
 
@@ -196,34 +201,7 @@ Vesper supports hands-free operation via Mentra smart glasses.
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────┐
-│              Vesper App                  │
-├─────────────────────────────────────────┤
-│  UI Layer (Jetpack Compose + Hilt)      │
-│  ├── Chat Screen (voice, images, text)  │
-│  ├── Ops Center                         │
-│  ├── Alchemy Lab & Payload Lab          │
-│  ├── File Browser & FapHub              │
-│  ├── Signal Arsenal & Spectral Oracle   │
-│  └── Device & Settings Screens          │
-├─────────────────────────────────────────┤
-│  Domain Layer                           │
-│  ├── VesperAgent (AI orchestration)     │
-│  ├── CommandExecutor (risk enforcement) │
-│  ├── RiskAssessor + PermissionService   │
-│  ├── ForgeEngine (payload generation)   │
-│  ├── DiffService + AuditService         │
-│  └── Signal Processing                  │
-├─────────────────────────────────────────┤
-│  Data Layer                             │
-│  ├── OpenRouterClient (LLM API)         │
-│  ├── FlipperBleService (BLE transport)  │
-│  ├── GlassesIntegration (Mentra bridge) │
-│  ├── Room Database (chat + audit)       │
-│  └── Encrypted DataStore (settings)     │
-└─────────────────────────────────────────┘
-```
+Layers, risk flow, and where code lives: [docs/architecture.md](docs/architecture.md).
 
 ## Project Structure
 

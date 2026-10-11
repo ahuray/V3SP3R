@@ -17,6 +17,8 @@ Thanks for your interest in contributing! Vesper is an open-source project and w
 4. **Open in Android Studio** and let Gradle sync
 5. **Build and test** your changes
 
+What the app does: [docs/guide.md](docs/guide.md). Rules for changing it: [AGENTS.md](AGENTS.md).
+
 ### Requirements
 
 - Android Studio (latest stable recommended)

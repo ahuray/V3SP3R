@@ -1,5 +1,7 @@
 # V3SP3R competition live-fire runbook
 
+Lab runbook only. The product manual is [guide.md](guide.md).
+
 This is the demo-day, live-fire companion to `docs/competition-runbook.md`. Read that safe runbook first, including its authorization rules, bench card, and the 60-second scripts for stations D1 through D8. Rehearse on the `safe-test` branch. Perform on this branch (`unsafe`).
 
 ## 1. Authorization gate

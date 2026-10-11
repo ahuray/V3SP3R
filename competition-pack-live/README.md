@@ -1,5 +1,7 @@
 # V3SP3R Security Competition Pack — LIVE
 
+Demo assets for the lab. The product manual is [../docs/guide.md](../docs/guide.md).
+
 **LAB USE ONLY.** This directory is the live-fire layer of the competition
 pack. It exists only on the `unsafe` branch, stacked on top of the full-dummy
 version (`competition-pack/`, branch `safe-test`). Everything here runs real

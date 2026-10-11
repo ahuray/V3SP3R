@@ -1,5 +1,7 @@
 # V3SP3R competition install
 
+Lab install only. The product manual is [guide.md](guide.md).
+
 Exact install for the organizer's phone and Flipper before the lab in `docs/competition-runbook.md`. Paths and UI strings below were taken from this checkout of `feature/competition-pack`. Anything not verified in that tree is marked `TODO(verify)`.
 
 ## 1. What you have

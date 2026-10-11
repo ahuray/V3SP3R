@@ -104,7 +104,7 @@ fun UnifiedDiffViewer(
                         .background(backgroundColor)
                         .padding(horizontal = 8.dp, vertical = 2.dp),
                     fontFamily = FontFamily.Monospace,
-                    fontSize = 12.sp,
+                    fontSize = 14.sp,
                     color = textColor
                 )
             }
@@ -183,9 +183,9 @@ private fun DiffLineRow(line: DiffLine) {
                 // Line number
                 Text(
                     text = line.originalLineNumber?.toString() ?: "",
-                    modifier = Modifier.width(32.dp),
+                    modifier = Modifier.width(36.dp),
                     fontFamily = FontFamily.Monospace,
-                    fontSize = 11.sp,
+                    fontSize = 14.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.End
                 )
@@ -196,7 +196,7 @@ private fun DiffLineRow(line: DiffLine) {
                 Text(
                     text = line.originalContent ?: "",
                     fontFamily = FontFamily.Monospace,
-                    fontSize = 12.sp,
+                    fontSize = 14.sp,
                     color = when (line.type) {
                         DiffLineType.REMOVED, DiffLineType.CHANGED -> DiffRemoved
                         else -> MaterialTheme.colorScheme.onSurface
@@ -221,9 +221,9 @@ private fun DiffLineRow(line: DiffLine) {
                 // Line number
                 Text(
                     text = line.newLineNumber?.toString() ?: "",
-                    modifier = Modifier.width(32.dp),
+                    modifier = Modifier.width(36.dp),
                     fontFamily = FontFamily.Monospace,
-                    fontSize = 11.sp,
+                    fontSize = 14.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.End
                 )
@@ -234,7 +234,7 @@ private fun DiffLineRow(line: DiffLine) {
                 Text(
                     text = line.newContent ?: "",
                     fontFamily = FontFamily.Monospace,
-                    fontSize = 12.sp,
+                    fontSize = 14.sp,
                     color = when (line.type) {
                         DiffLineType.ADDED, DiffLineType.CHANGED -> DiffAdded
                         else -> MaterialTheme.colorScheme.onSurface

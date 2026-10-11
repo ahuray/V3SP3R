@@ -13,7 +13,7 @@ class FirmwareIdentityTest {
         assertEquals(FirmwareFamily.UNLEASHED, FirmwareIdentity.detect("firmware_version=unlshd-093"))
         assertEquals(FirmwareFamily.UNLEASHED, FirmwareIdentity.detect("Unleashed"))
         assertFalse(FirmwareIdentity.looksOfficial("Flipper firmware"))
-        assertFalse(FirmwareIdentity.looksOfficial("Flipper Umrleum"))
+        assertFalse(FirmwareIdentity.looksOfficial("Flipper Lab"))
         assertNull(FirmwareIdentity.detect("Flipper firmware"))
     }
 

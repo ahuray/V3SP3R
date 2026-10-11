@@ -21,15 +21,12 @@ Vesper is an Android application that enables AI-driven control of a Flipper Zer
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    Presentation Layer                        │
-│  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌────────┐ │
-│  │  Chat   │ │  Files  │ │ Device  │ │  Audit  │ │Settings│ │
-│  │ Screen  │ │ Browser │ │ Screen  │ │  Screen │ │ Screen │ │
-│  └────┬────┘ └────┬────┘ └────┬────┘ └────┬────┘ └───┬────┘ │
-│       │           │           │           │          │       │
-│  ┌────┴───────────┴───────────┴───────────┴──────────┴────┐ │
-│  │                      ViewModels                         │ │
-│  └────────────────────────────┬────────────────────────────┘ │
-└───────────────────────────────┼──────────────────────────────┘
+│  Chat, Alchemy, FapHub, Device, Settings                    │
+│  Files, Audit, Arsenal, Oracle, Payloads, Stage, Ops        │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │                      ViewModels                       │  │
+│  └────────────────────────────┬──────────────────────────┘  │
+└───────────────────────────────┼─────────────────────────────┘
                                 │
 ┌───────────────────────────────┼──────────────────────────────┐
 │                      Domain Layer                            │
@@ -66,11 +63,13 @@ Vesper is an Android application that enables AI-driven control of a Flipper Zer
 
 ### Presentation Layer
 
-- **ChatScreen**: Main interaction point with the AI agent
-- **FileBrowserScreen**: Direct file system navigation
-- **DeviceScreen**: BLE connection management and device info
-- **AuditScreen**: View and filter action history
-- **SettingsScreen**: Configure API keys, permissions, and preferences
+Bottom tabs: Chat, Alchemy, FapHub, Device, Settings.
+
+Opened from those tabs: Files, Audit, Signal Arsenal, Spectral Oracle, Payload Lab, Stage Remote, Ops.
+
+Device itself has two pages. Flipper is the link, the live LCD, the remote pad, and the passport. Accessories is the board list, empty until someone marks a board mounted.
+
+Screen behavior is in [guide.md](guide.md). Agent rules for those screens are in [AGENTS.md](../AGENTS.md).
 
 ### Domain Layer
 
@@ -120,11 +119,11 @@ Execute immediately
 └───┬───┘                       └──┬───┘
     │                              │
     ▼                              ▼
-Show diff                   Hold-to-confirm
+Show diff                   Ask to confirm
     │                              │
     ▼                              ▼
-User clicks               User holds button
-"Apply"                      1.5 seconds
+User applies the diff     User double-taps
+                          within 1.8 seconds
     │                              │
     └──────────────┬───────────────┘
                    │
@@ -151,7 +150,7 @@ The app communicates with Flipper Zero over BLE using the device's serial profil
 - Permissions are scoped and time-limited
 - Protected paths require explicit unlock
 - All operations are logged for audit
-- Hold-to-confirm prevents accidental destructive actions
+- High-risk actions require a double-tap before they run
 - No raw BLE access from AI model
 
 ## Dependencies

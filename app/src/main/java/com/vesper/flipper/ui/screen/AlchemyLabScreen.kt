@@ -442,7 +442,7 @@ private fun BlueprintCard(
                 shape = RoundedCornerShape(8.dp)
             ) {
                 Box(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(12.dp)) {
-                    Text(blueprint.generatedCode, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall, color = VesperAccent.copy(alpha = 0.8f), fontSize = 11.sp)
+                    Text(blueprint.generatedCode, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall, color = VesperAccent.copy(alpha = 0.8f))
                 }
             }
 
@@ -560,7 +560,7 @@ private fun LootCardItem(
                     Text(loot.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                     Spacer(modifier = Modifier.width(8.dp))
                     Surface(color = Color(loot.rarity.glowColor), shape = RoundedCornerShape(4.dp)) {
-                        Text(loot.rarity.displayName, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), style = MaterialTheme.typography.labelSmall, color = rarityColor, fontWeight = FontWeight.Bold, fontSize = 9.sp)
+                        Text(loot.rarity.displayName, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), style = MaterialTheme.typography.labelSmall, color = rarityColor, fontWeight = FontWeight.Bold)
                     }
                 }
                 val metaLine = buildString {
@@ -572,7 +572,7 @@ private fun LootCardItem(
                     Row(modifier = Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         loot.tags.take(3).forEach { tag ->
                             Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(4.dp)) {
-                                Text(tag, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), style = MaterialTheme.typography.labelSmall, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(tag, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }

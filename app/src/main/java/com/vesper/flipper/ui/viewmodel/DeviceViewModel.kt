@@ -13,6 +13,9 @@ import com.vesper.flipper.ble.FirmwareCompatibilityProfile
 import com.flipperdevices.protobuf.screen.Gui
 import com.vesper.flipper.ble.FlipperDevice
 import com.vesper.flipper.ble.FlipperFileSystem
+import com.vesper.flipper.ble.FlipperPassportClient
+import com.vesper.flipper.ble.PassportSnapshot
+import com.vesper.flipper.domain.model.DolphinMood
 import com.vesper.flipper.ble.GuiRemoteInput
 import com.vesper.flipper.ble.FlipperScreenImage
 import com.vesper.flipper.data.SettingsStore
@@ -54,6 +57,21 @@ class DeviceViewModel @Inject constructor(
     private val _connectedDevice = MutableStateFlow<FlipperDevice?>(null)
     val connectedDevice: StateFlow<FlipperDevice?> = _connectedDevice.asStateFlow()
 
+    private val _mountedAccessoryIds = MutableStateFlow<Set<String>>(emptySet())
+    val mountedAccessoryIds: StateFlow<Set<String>> = _mountedAccessoryIds.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            settingsStore.mountedAccessoryIds.collect { _mountedAccessoryIds.value = it }
+        }
+    }
+
+    fun setAccessoryMounted(id: String, mounted: Boolean) {
+        viewModelScope.launch {
+            settingsStore.setAccessoryMounted(id, mounted)
+        }
+    }
+
     private val _deviceInfo = MutableStateFlow<DeviceInfo?>(null)
     val deviceInfo: StateFlow<DeviceInfo?> = _deviceInfo.asStateFlow()
 
@@ -76,6 +94,21 @@ class DeviceViewModel @Inject constructor(
     private val _remoteInputStatus = MutableStateFlow<String?>(null)
     val remoteInputStatus: StateFlow<String?> = _remoteInputStatus.asStateFlow()
     val screenFrame: StateFlow<FlipperScreenImage?> = fileSystem.screenFrame
+    private val passportClient = FlipperPassportClient(fileSystem)
+    private val _passport = MutableStateFlow(PassportSnapshot(
+        mood = null,
+        level = null,
+        animations = emptyList(),
+        activeAnimation = null,
+        stateReady = false,
+        manifestReady = false,
+        note = null
+    ))
+    val passport: StateFlow<PassportSnapshot> = _passport.asStateFlow()
+    private val _passportBusy = MutableStateFlow(false)
+    val passportBusy: StateFlow<Boolean> = _passportBusy.asStateFlow()
+    private val _passportStatus = MutableStateFlow<String?>(null)
+    val passportStatus: StateFlow<String?> = _passportStatus.asStateFlow()
     private val _screenStreamStatus = MutableStateFlow<String?>(null)
     val screenStreamStatus: StateFlow<String?> = _screenStreamStatus.asStateFlow()
     // Glasses bridge state
@@ -316,12 +349,19 @@ class DeviceViewModel @Inject constructor(
         screenMirrorJob = null
         viewModelScope.launch {
             if (generation != screenMirrorGeneration) return@launch
-            if (_connectionState.value is ConnectionState.Connected) {
-                fileSystem.stopScreenStream()
-            }
-            if (generation == screenMirrorGeneration) {
-                _screenStreamStatus.value = null
-            }
+            haltScreenMirror(generation)
+        }
+    }
+
+    private suspend fun haltScreenMirror(generation: Int = ++screenMirrorGeneration) {
+        screenMirrorJob?.cancel()
+        screenMirrorJob = null
+        if (generation != screenMirrorGeneration) return
+        if (_connectionState.value is ConnectionState.Connected) {
+            fileSystem.stopScreenStream()
+        }
+        if (generation == screenMirrorGeneration) {
+            _screenStreamStatus.value = null
         }
     }
 
@@ -538,6 +578,43 @@ class DeviceViewModel @Inject constructor(
 
     fun disconnectGlassesBridge() {
         glassesIntegration.disconnect()
+    }
+
+    fun refreshPassport() {
+        if (_connectionState.value !is ConnectionState.Connected) return
+        viewModelScope.launch {
+            _passportBusy.value = true
+            _passport.value = passportClient.load()
+            _passportStatus.value = _passport.value.note
+            _passportBusy.value = false
+        }
+    }
+
+    fun applyPassport(
+        mood: DolphinMood,
+        level: Int,
+        animation: String?,
+        updateState: Boolean,
+        updateAnimation: Boolean
+    ) {
+        if (_passportBusy.value) return
+        viewModelScope.launch {
+            _passportBusy.value = true
+            _passportStatus.value = "Saving…"
+            if (updateState) haltScreenMirror()
+            val saved = passportClient.apply(mood, level, animation, updateState, updateAnimation)
+            saved.onSuccess { result ->
+                _passportStatus.value = result.message
+                if (result.restartRequired) {
+                    fileSystem.rebootOs()
+                } else {
+                    _passport.value = passportClient.load()
+                }
+            }.onFailure { error ->
+                _passportStatus.value = error.message ?: "Couldn't save the passport."
+            }
+            _passportBusy.value = false
+        }
     }
 
 }

@@ -1,5 +1,7 @@
 # V3SP3R competition runbook
 
+Lab runbook only. The product manual is [guide.md](guide.md).
+
 This runbook is for the organizer of an internal company security competition. Each station shows one offense (red) and one defense (blue) on a Flipper Zero running Unleashed firmware, driven where needed by the Vesper Android app (package `com.vesper.flipper`, launcher name **Vesper**). Every transmit, badge read, USB plug-in, and Wi-Fi action stays on equipment the company owns, inside the lab, under the written scope in section 2.
 
 ## 2. Authorization and safety

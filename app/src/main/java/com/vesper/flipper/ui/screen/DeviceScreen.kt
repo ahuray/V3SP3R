@@ -52,6 +52,8 @@ import com.vesper.flipper.ble.FirmwareTransportMode
 import com.vesper.flipper.ble.FlipperDevice
 import com.vesper.flipper.ble.FlipperScreenImage
 import com.vesper.flipper.ble.FlipperScreenOrientation
+import com.vesper.flipper.ble.PassportSnapshot
+import com.vesper.flipper.domain.model.DolphinMood
 import com.vesper.flipper.domain.model.FlipperRemoteButton
 import com.vesper.flipper.glasses.BridgeState
 import com.vesper.flipper.ui.theme.*
@@ -88,12 +90,20 @@ fun DeviceScreen(
     val remoteInputStatus by viewModel.remoteInputStatus.collectAsState()
     val screenFrame by viewModel.screenFrame.collectAsState()
     val screenStreamStatus by viewModel.screenStreamStatus.collectAsState()
+    val passport by viewModel.passport.collectAsState()
+    val passportBusy by viewModel.passportBusy.collectAsState()
+    val passportStatus by viewModel.passportStatus.collectAsState()
+    val mountedAccessoryIds by viewModel.mountedAccessoryIds.collectAsState()
+    var devicePage by rememberSaveable { mutableStateOf(0) }
     val connected = connectionState is ConnectionState.Connected
     var liveScreen by rememberSaveable { mutableStateOf(true) }
 
     LaunchedEffect(connected, liveScreen) {
         if (connected && liveScreen) viewModel.startScreenMirror()
         else viewModel.stopScreenMirror()
+    }
+    LaunchedEffect(connected) {
+        if (connected) viewModel.refreshPassport()
     }
     DisposableEffect(Unit) {
         onDispose { viewModel.stopScreenMirror() }
@@ -168,7 +178,26 @@ fun DeviceScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-        if (connectionState is ConnectionState.Connected) {
+        TabRow(selectedTabIndex = devicePage) {
+            Tab(
+                selected = devicePage == 0,
+                onClick = { devicePage = 0 },
+                text = { Text("Flipper") }
+            )
+            Tab(
+                selected = devicePage == 1,
+                onClick = { devicePage = 1 },
+                text = { Text("Accessories") }
+            )
+        }
+        if (devicePage == 1) {
+            AccessoriesPage(
+                connected = connectionState is ConnectionState.Connected,
+                mountedIds = mountedAccessoryIds,
+                onMountedChange = viewModel::setAccessoryMounted,
+                modifier = Modifier.weight(1f)
+            )
+        } else if (connectionState is ConnectionState.Connected) {
             RemoteControlCard(
                 modifier = Modifier
                     .weight(1f)
@@ -190,10 +219,16 @@ fun DeviceScreen(
                 onNavigateToPayloadLab = onNavigateToPayloadLab,
                 onNavigateToStageRemote = onNavigateToStageRemote,
                 onNavigateToOps = onNavigateToOps,
-                onNavigateToAudit = onNavigateToAudit
+                onNavigateToAudit = onNavigateToAudit,
+                deviceName = connectedDevice?.name ?: deviceInfo?.name.orEmpty(),
+                passport = passport,
+                passportBusy = passportBusy,
+                passportStatus = passportStatus,
+                onApplyPassport = { mood, level, animation, updateState, updateAnimation ->
+                    viewModel.applyPassport(mood, level, animation, updateState, updateAnimation)
+                }
             )
-        }
-        if (connectionState !is ConnectionState.Connected) LazyColumn(
+        } else if (connectionState !is ConnectionState.Connected) LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
@@ -254,10 +289,6 @@ fun DeviceScreen(
                         onClick = { viewModel.connectToDevice(device) }
                     )
                 }
-            }
-
-            item {
-                FiveGhostBriefCard()
             }
 
             item {
@@ -940,58 +971,58 @@ private fun RemoteControlCard(
     onNavigateToStageRemote: () -> Unit,
     onNavigateToOps: () -> Unit,
     onNavigateToAudit: () -> Unit,
+    deviceName: String,
+    passport: PassportSnapshot,
+    passportBusy: Boolean,
+    passportStatus: String?,
+    onApplyPassport: (DolphinMood, Int, String?, Boolean, Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        // The picture slot stays the same height when Live is toggled, so the
+        // switch under it does not move and the page does not jump.
         Card(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceVariant
             )
         ) {
-            if (liveScreen) {
-                FlipperScreenMirror(
-                    frame = screenFrame,
-                    status = screenStatus,
-                    onRetry = onRetryScreen,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(12.dp)
-                )
-            } else {
-                FlipperKit(
-                    compact = false,
-                    dense = true,
-                    onNavigateToFiles = onNavigateToFiles,
-                    onNavigateToOracle = onNavigateToOracle,
-                    onNavigateToArsenal = onNavigateToArsenal,
-                    onNavigateToPayloadLab = onNavigateToPayloadLab,
-                    onNavigateToStageRemote = onNavigateToStageRemote,
-                    onNavigateToOps = onNavigateToOps,
-                    onNavigateToAudit = onNavigateToAudit,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(12.dp)
-                )
-            }
-        }
-        if (liveScreen) {
-            FlipperKit(
-                compact = true,
-                onNavigateToFiles = onNavigateToFiles,
-                onNavigateToOracle = onNavigateToOracle,
-                onNavigateToArsenal = onNavigateToArsenal,
-                onNavigateToPayloadLab = onNavigateToPayloadLab,
-                onNavigateToStageRemote = onNavigateToStageRemote,
-                onNavigateToOps = onNavigateToOps,
-                onNavigateToAudit = onNavigateToAudit
+            FlipperScreenMirror(
+                frame = screenFrame,
+                status = screenStatus,
+                paused = !liveScreen,
+                onRetry = onRetryScreen,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp)
             )
         }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = if (liveScreen) "Live screen" else "Live screen paused",
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold
+            )
+            Switch(
+                checked = liveScreen,
+                onCheckedChange = onLiveScreenChange
+            )
+        }
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
@@ -1025,22 +1056,6 @@ private fun RemoteControlCard(
                     Text("Disconnect")
                 }
             }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Start,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = if (liveScreen) "Live screen on" else "Live screen off",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Switch(
-                    checked = liveScreen,
-                    onCheckedChange = onLiveScreenChange
-                )
-            }
-
             DPadRow {
                 RemoteHoldButton(
                     icon = Icons.Default.KeyboardArrowUp,
@@ -1109,11 +1124,29 @@ private fun RemoteControlCard(
             statusText?.let { status ->
                 Text(
                     text = status,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
+        }
+        FlipperKit(
+            compact = true,
+            onNavigateToFiles = onNavigateToFiles,
+            onNavigateToOracle = onNavigateToOracle,
+            onNavigateToArsenal = onNavigateToArsenal,
+            onNavigateToPayloadLab = onNavigateToPayloadLab,
+            onNavigateToStageRemote = onNavigateToStageRemote,
+            onNavigateToOps = onNavigateToOps,
+            onNavigateToAudit = onNavigateToAudit
+        )
+        PassportCard(
+            deviceName = deviceName,
+            passport = passport,
+            busy = passportBusy,
+            status = passportStatus,
+            onApply = onApplyPassport
+        )
         }
     }
 }
@@ -1329,12 +1362,14 @@ private fun KitChip(tool: KitTool) {
         color = MaterialTheme.colorScheme.surface
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            modifier = Modifier
+                .heightIn(min = 48.dp)
+                .padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Icon(tool.icon, contentDescription = null, tint = tool.tint, modifier = Modifier.size(16.dp))
-            Text(tool.title, style = MaterialTheme.typography.labelLarge)
+            Icon(tool.icon, contentDescription = null, tint = tool.tint, modifier = Modifier.size(20.dp))
+            Text(tool.title, style = MaterialTheme.typography.titleSmall)
         }
     }
 }
@@ -1343,18 +1378,24 @@ private fun KitChip(tool: KitTool) {
 private fun FlipperScreenMirror(
     frame: FlipperScreenImage?,
     status: String?,
+    paused: Boolean,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val bitmap = remember(frame?.id) { frame?.toLcdBitmap() }
+    val aspect = if (bitmap != null && bitmap.height > 0) {
+        bitmap.width.toFloat() / bitmap.height.toFloat()
+    } else {
+        2f
+    }
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Box(
             modifier = Modifier
-                .weight(1f)
                 .fillMaxWidth()
+                .aspectRatio(aspect)
                 .clip(RoundedCornerShape(12.dp))
                 .background(Color(0xFF0C1210))
                 .padding(8.dp),
@@ -1380,10 +1421,10 @@ private fun FlipperScreenMirror(
                 ) {
                     Text(
                         text = status ?: "Waiting for the Flipper screen",
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodyLarge,
                         color = Color(0xFF1C2418),
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(horizontal = 12.dp)
+                        modifier = Modifier.padding(horizontal = 16.dp)
                     )
                 }
             }
@@ -1395,11 +1436,12 @@ private fun FlipperScreenMirror(
         ) {
             Text(
                 text = when {
+                    paused && bitmap != null -> "Paused"
                     bitmap != null -> "Live Flipper screen"
                     status.isNullOrBlank() -> "Flipper screen"
                     else -> status
                 },
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyLarge,
                 color = if (bitmap != null || status == "Live") VesperAccent else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f)
             )
@@ -1436,45 +1478,6 @@ private fun FlipperScreenImage.toLcdBitmap(): androidx.compose.ui.graphics.Image
     val bitmap = Bitmap.createBitmap(destWidth, destHeight, Bitmap.Config.ARGB_8888)
     bitmap.setPixels(argb, 0, destWidth, 0, 0, destWidth, destHeight)
     return bitmap.asImageBitmap()
-}
-
-@Composable
-private fun FiveGhostBriefCard() {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                "5Ghost board, on the way",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                "A dual-band 2.4 and 5 GHz Wi-Fi add-on (RTL8720DN) that docks on the Flipper’s GPIO header. The Flipper has no Wi-Fi radio until that board is seated. It ships with its own firmware already loaded.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            BriefLine("Dock it", "Power the Flipper off, tighten the antenna, seat the board straight on the top GPIO pins, then power on.")
-            BriefLine("What to show", "Most office networks are on 5 GHz. A 2.4-only add-on never sees them. WPA3 and protected management frames are what stop a forced disconnect.")
-            BriefLine("How to run the demo", "Only on a network your security team owns, with one of them in the room. Lead with detection and architecture, not a disconnect.")
-        }
-    }
-}
-
-@Composable
-private fun BriefLine(title: String, detail: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = VesperCyan)
-        Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
 }
 
 @Composable

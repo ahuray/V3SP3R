@@ -1,5 +1,7 @@
 # Presenter notes — competition demo day
 
+Stage notes only. The product manual is [guide.md](guide.md).
+
 Two audiences, two branches. **Coworkers** see `safe-test` (full dummy): a
 magic show with a moral. **Head of Security** sees `unsafe`: a budget argument
 with props. This file is only the stage layer. The safety gates live in

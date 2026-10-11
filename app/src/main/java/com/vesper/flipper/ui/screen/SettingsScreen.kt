@@ -363,35 +363,14 @@ fun SettingsScreen(
 
                     SettingsSwitch(
                         title = "High risk",
-                        subtitle = "Deletes, moves, overwrites, mass ops",
+                        subtitle = if (state.autoApproveHigh) {
+                            "On. Deletes and overwrites run without asking."
+                        } else {
+                            "Deletes, moves, overwrites, mass ops."
+                        },
                         checked = state.autoApproveHigh,
                         onCheckedChange = { viewModel.setAutoApproveHigh(it) }
                     )
-                    if (state.autoApproveHigh) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = RiskHigh.copy(alpha = 0.15f)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    Icons.Default.Warning,
-                                    contentDescription = null,
-                                    tint = RiskHigh,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    "Destructive actions will execute without confirmation.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = RiskHigh
-                                )
-                            }
-                        }
-                    }
                 }
             }
 
@@ -526,18 +505,18 @@ fun SettingsScreen(
                         onCheckedChange = { viewModel.setGlassesEnabled(it) }
                     )
 
-                    if (state.glassesEnabled) {
-                        Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                        OutlinedTextField(
-                            value = state.glassesBridgeUrl,
-                            onValueChange = { viewModel.setGlassesBridgeUrl(it) },
-                            label = { Text("Bridge Server URL") },
-                            placeholder = { Text("ws://your-server:8089") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            shape = RoundedCornerShape(12.dp)
-                        )
+                    OutlinedTextField(
+                        value = state.glassesBridgeUrl,
+                        onValueChange = { viewModel.setGlassesBridgeUrl(it) },
+                        enabled = state.glassesEnabled,
+                        label = { Text("Bridge Server URL") },
+                        placeholder = { Text("ws://your-server:8089") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp)
+                    )
                         Text(
                             text = "Your mentra-bridge server URL. Use ngrok for local dev.",
                             style = MaterialTheme.typography.bodySmall,
@@ -550,6 +529,7 @@ fun SettingsScreen(
                             title = "Auto-Send Voice",
                             subtitle = "Send glasses transcriptions to AI automatically",
                             checked = state.glassesAutoSend,
+                            enabled = state.glassesEnabled,
                             onCheckedChange = { viewModel.setGlassesAutoSend(it) }
                         )
 
@@ -559,6 +539,7 @@ fun SettingsScreen(
                             title = "Auto-Connect",
                             subtitle = "Reconnect to bridge on app startup",
                             checked = state.glassesAutoConnect,
+                            enabled = state.glassesEnabled,
                             onCheckedChange = { viewModel.setGlassesAutoConnect(it) }
                         )
 
@@ -568,6 +549,7 @@ fun SettingsScreen(
                             title = "Sailor Mouth Mode",
                             subtitle = "Vesper swears like a hacker. Not for the faint of heart.",
                             checked = state.glassesSailorMouth,
+                            enabled = state.glassesEnabled,
                             onCheckedChange = { viewModel.setGlassesSailorMouth(it) }
                         )
 
@@ -577,9 +559,9 @@ fun SettingsScreen(
                             title = "Mute Glasses Mic",
                             subtitle = "Pause listening — glasses won't hear audio until unmuted.",
                             checked = state.glassesMuted,
+                            enabled = state.glassesEnabled,
                             onCheckedChange = { viewModel.setGlassesMuted(it) }
                         )
-                    }
                 }
             }
 
@@ -669,6 +651,7 @@ private fun SettingsSwitch(
     title: String,
     subtitle: String,
     checked: Boolean,
+    enabled: Boolean = true,
     onCheckedChange: (Boolean) -> Unit
 ) {
     Row(
@@ -689,6 +672,7 @@ private fun SettingsSwitch(
         }
         Switch(
             checked = checked,
+            enabled = enabled,
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
                 checkedThumbColor = VesperOrange,
