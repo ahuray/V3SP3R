@@ -17,6 +17,7 @@ keystore/
 
 # Generated files
 *.apk
+!/vesper-unleashed-debug.apk
 *.aab
 *.ap_
 *.dex
