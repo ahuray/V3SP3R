@@ -99,6 +99,45 @@ class FlipperCatalogJsonTest {
     }
 
     @Test
+    fun `unleashed minor falls back to the same major catalog build`() {
+        assertEquals(
+            listOf("88.17", "88.2"),
+            FlipperCatalogJson.compatibleApis(
+                deviceApi = "88.17",
+                firmware = "unlshd-dev",
+                publishedApis = listOf("87.1", "88.2", "86.0"),
+                latestReleaseApi = "87.1",
+                appCurrentApi = "87.1",
+            )
+        )
+    }
+
+    @Test
+    fun `unleashed banner without a device api stays on major 88`() {
+        assertEquals(
+            listOf("88.2"),
+            FlipperCatalogJson.compatibleApis(
+                deviceApi = null,
+                firmware = "unlshd-093",
+                publishedApis = listOf("87.1", "88.2"),
+                latestReleaseApi = "87.1",
+                appCurrentApi = "87.1",
+            )
+        )
+        assertEquals(88, FlipperCatalogJson.majorHintForFirmware("Unleashed unlshd-093"))
+    }
+
+    @Test
+    fun `sdk list parser keeps published api strings`() {
+        assertEquals(
+            listOf("87.1", "88.2"),
+            FlipperCatalogJson.parseSdkApis(
+                """[{"api":"87.1","is_latest_release":true},{"api":"88.2","is_latest_release":false}]"""
+            )
+        )
+    }
+
+    @Test
     fun `fap files are elf binaries`() {
         assertTrue(FlipperCatalogJson.isFapElf(byteArrayOf(0x7f, 'E'.code.toByte(), 'L'.code.toByte(), 'F'.code.toByte(), 1)))
         assertFalse(FlipperCatalogJson.isFapElf("<html>".toByteArray()))

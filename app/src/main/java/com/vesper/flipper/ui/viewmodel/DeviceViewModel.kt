@@ -200,6 +200,8 @@ class DeviceViewModel @Inject constructor(
     companion object {
         /** Total wall-clock budget for the on-connect device info refresh. */
         private const val REFRESH_DEVICE_INFO_TIMEOUT_MS = 6_000L
+        /** Keep the remote pad from sitting on "Sending…" if the link never answers. */
+        private const val REMOTE_INPUT_TIMEOUT_MS = 12_000L
     }
 
     fun runConnectionDiagnostics() {
@@ -269,7 +271,14 @@ class DeviceViewModel @Inject constructor(
         val pressLabel = if (longPress) "hold ${button.label}" else button.label
         _remoteInputStatus.value = "Sending $pressLabel..."
         return try {
-            fileSystem.sendRemoteButton(button, longPress).also { result ->
+            val result = withTimeoutOrNull(REMOTE_INPUT_TIMEOUT_MS) {
+                fileSystem.sendRemoteButton(button, longPress)
+            } ?: Result.failure(
+                IllegalStateException(
+                    "Remote input timed out. Bluetooth did not answer. Reconnect the Flipper and try again."
+                )
+            )
+            result.also {
                 _remoteInputStatus.value = result.fold(
                     onSuccess = { details ->
                         details.ifBlank { "Sent ${button.label}." }
