@@ -417,7 +417,7 @@ private fun EmptyChat(onSuggestionClick: (String) -> Unit) {
                 modifier = Modifier
                     .size(72.dp)
                     .clip(CircleShape)
-                    .background(VesperOrange.copy(alpha = 0.08f)),
+                    .background(VesperOrange.copy(alpha = 0.22f)),
                 contentAlignment = Alignment.Center
             ) {
                 Box(
@@ -428,7 +428,7 @@ private fun EmptyChat(onSuggestionClick: (String) -> Unit) {
                         .then(
                             Modifier.background(
                                 brush = Brush.radialGradient(
-                                    colors = listOf(VesperOrange.copy(alpha = 0.15f), Color.Transparent)
+                                    colors = listOf(VesperOrange.copy(alpha = 0.40f), Color.Transparent)
                                 )
                             )
                         ),
@@ -450,12 +450,12 @@ private fun EmptyChat(onSuggestionClick: (String) -> Unit) {
                 "VESPER",
                 style = MaterialTheme.typography.labelLarge,
                 letterSpacing = 4.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                color = MaterialTheme.colorScheme.onSurface
             )
             Text(
                 "Your Flipper. Your rules.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(20.dp))
             Column(
@@ -469,7 +469,7 @@ private fun EmptyChat(onSuggestionClick: (String) -> Unit) {
             Text(
                 "Voice and image input supported",
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f)
             )
         }
     }
@@ -480,8 +480,8 @@ private fun SuggestionChip(text: String, onClick: (String) -> Unit) {
     Surface(
         onClick = { onClick(text) },
         shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.7f))
     ) {
         Text(
             text = text,

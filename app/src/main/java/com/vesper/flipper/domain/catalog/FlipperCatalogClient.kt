@@ -83,6 +83,81 @@ object FlipperCatalogJson {
         return if (trimmed.matches(Regex("""\d+\.\d+"""))) trimmed else null
     }
 
+    fun apiMajor(api: String?): Int? = normalizeApi(api)?.substringBefore('.')?.toIntOrNull()
+
+    fun apiMinor(api: String?): Int? = normalizeApi(api)?.substringAfter('.')?.toIntOrNull()
+
+    /**
+     * Unleashed dev (October 2026) reports API 88.x, while the public catalog's
+     * newest 88.x artifact is 88.2. The loader compares major only — the minor
+     * check in application_manifest.c is compiled out — so an 88.2 FAP loads
+     * on 88.17 / 88.18 firmware and an 87.x FAP does not.
+     */
+    fun majorHintForFirmware(firmware: String?): Int? {
+        val normalized = firmware?.lowercase()?.trim().orEmpty()
+        if (normalized.isBlank() || normalized == "unknown") return null
+        if (normalized.contains("unlshd") || normalized.contains("unleashed")) return 88
+        return apiMajor(sdkApiForFirmware(firmware))
+    }
+
+    /**
+     * APIs to try, exact device API first. When that build 404s, continue with
+     * other published catalog APIs of the same major (closest minor at or below
+     * the device, then newer).
+     */
+    fun compatibleApis(
+        deviceApi: String?,
+        firmware: String?,
+        publishedApis: List<String>,
+        latestReleaseApi: String?,
+        appCurrentApi: String?,
+    ): List<String> {
+        val exact = normalizeApi(deviceApi)
+        if (exact != null) {
+            return pinToMajor(exact, publishedApis, latestReleaseApi, appCurrentApi)
+        }
+        val mapped = sdkApiForFirmware(firmware)
+        if (mapped != null) {
+            return pinToMajor(mapped, publishedApis, latestReleaseApi, appCurrentApi)
+        }
+        val major = majorHintForFirmware(firmware)
+        if (major != null) {
+            val ranked = sameMajorApis(major, publishedApis, latestReleaseApi, appCurrentApi, exclude = null)
+            if (ranked.isNotEmpty()) return ranked
+        }
+        return candidateApis(firmware, latestReleaseApi, appCurrentApi)
+    }
+
+    private fun pinToMajor(
+        exact: String,
+        publishedApis: List<String>,
+        latestReleaseApi: String?,
+        appCurrentApi: String?,
+    ): List<String> {
+        val major = apiMajor(exact) ?: return listOf(exact)
+        val minor = apiMinor(exact) ?: return listOf(exact)
+        val others = sameMajorApis(major, publishedApis, latestReleaseApi, appCurrentApi, exclude = exact)
+        val notNewer = others.filter { (apiMinor(it) ?: Int.MAX_VALUE) <= minor }
+            .sortedByDescending { apiMinor(it) ?: -1 }
+        val newer = others.filter { (apiMinor(it) ?: -1) > minor }
+            .sortedBy { apiMinor(it) ?: Int.MAX_VALUE }
+        return (listOf(exact) + notNewer + newer).distinct()
+    }
+
+    private fun sameMajorApis(
+        major: Int,
+        publishedApis: List<String>,
+        latestReleaseApi: String?,
+        appCurrentApi: String?,
+        exclude: String?,
+    ): List<String> {
+        return (publishedApis + listOfNotNull(latestReleaseApi, appCurrentApi))
+            .mapNotNull(::normalizeApi)
+            .filter { apiMajor(it) == major && it != exclude }
+            .distinct()
+            .sortedByDescending { apiMinor(it) ?: -1 }
+    }
+
     fun candidateApis(firmware: String?, latestReleaseApi: String?, currentApi: String?): List<String> {
         return listOfNotNull(
             sdkApiForFirmware(firmware),
@@ -107,6 +182,14 @@ object FlipperCatalogJson {
         }
     }
 
+    fun parseSdkApis(body: String): List<String> {
+        val array = json.parseToJsonElement(body) as? JsonArray ?: return emptyList()
+        return array.mapNotNull { element ->
+            val obj = element as? JsonObject ?: return@mapNotNull null
+            obj.string("api")
+        }
+    }
+
     fun parseLatestReleaseApi(body: String): String? {
         val array = json.parseToJsonElement(body) as? JsonArray ?: return null
         return array.firstNotNullOfOrNull { element ->
@@ -126,6 +209,7 @@ class FlipperCatalogClient(
 ) {
     @Volatile private var applications: List<CatalogApplication>? = null
     @Volatile private var latestReleaseApi: String? = null
+    @Volatile private var publishedSdkApis: List<String>? = null
 
     suspend fun downloadFap(
         alias: String,
@@ -138,22 +222,20 @@ class FlipperCatalogClient(
         val app = loadApplications().firstOrNull { it.alias.equals(needle, ignoreCase = true) }
             ?: throw IOException("Flipper catalog has no app named \"$needle\"")
 
-        // Prefer the SDK API the device reports directly — it is correct for any
-        // firmware fork (Unleashed/RogueMaster/Momentum). Otherwise map from the
-        // firmware name. When either resolves, pin to exactly that build, since
-        // falling back to another API installs an ELF compiled for a different
-        // SDK, which can crash on the device.
-        val knownApi = FlipperCatalogJson.normalizeApi(deviceApi)
+        // Prefer the SDK API the device reports. Unleashed often sits on a minor
+        // the catalog never built (88.17 vs catalog 88.2). The loader accepts any
+        // build with the same major, so try that exact API and then the other
+        // published builds of that major.
+        val publishedApis = loadSdkApis()
+        val apis = FlipperCatalogJson.compatibleApis(
+            deviceApi = deviceApi,
+            firmware = firmwareVersion,
+            publishedApis = publishedApis,
+            latestReleaseApi = latestReleaseApi,
+            appCurrentApi = app.currentApi,
+        )
+        val pinnedApi = FlipperCatalogJson.normalizeApi(deviceApi)
             ?: FlipperCatalogJson.sdkApiForFirmware(firmwareVersion)
-        val apis = if (knownApi != null) {
-            listOf(knownApi)
-        } else {
-            FlipperCatalogJson.candidateApis(
-                firmware = firmwareVersion,
-                latestReleaseApi = loadLatestReleaseApi(),
-                currentApi = app.currentApi,
-            )
-        }
         var lastError: Exception? = null
         for (api in apis) {
             try {
@@ -175,10 +257,16 @@ class FlipperCatalogClient(
                 lastError = error
             }
         }
-        if (knownApi != null) {
+        if (pinnedApi != null) {
+            val extras = apis.filter { it != pinnedApi }
+            val extraNote = if (extras.isEmpty()) {
+                "The catalog has no other build with the same API major."
+            } else {
+                "Also tried ${extras.joinToString()} (same API major, which Unleashed accepts)."
+            }
             throw IOException(
-                "No ${app.alias} build is available for your firmware's SDK (API $knownApi). " +
-                    "Update the app or firmware so their SDK APIs match. ${lastError?.message ?: ""}".trim()
+                "No ${app.alias} build is available for your firmware's SDK (API $pinnedApi). " +
+                    "$extraNote ${lastError?.message ?: ""}".trim()
             )
         }
         throw IOException(
@@ -197,12 +285,22 @@ class FlipperCatalogClient(
 
     private fun loadLatestReleaseApi(): String? {
         latestReleaseApi?.let { return it }
+        loadSdkApis()
+        return latestReleaseApi
+    }
+
+    private fun loadSdkApis(): List<String> {
+        publishedSdkApis?.let { return it }
         return try {
-            val parsed = FlipperCatalogJson.parseLatestReleaseApi(getText(FlipperCatalogJson.sdkUrl()))
-            latestReleaseApi = parsed
-            parsed
+            val body = getText(FlipperCatalogJson.sdkUrl())
+            val apis = FlipperCatalogJson.parseSdkApis(body)
+            publishedSdkApis = apis
+            if (latestReleaseApi == null) {
+                latestReleaseApi = FlipperCatalogJson.parseLatestReleaseApi(body)
+            }
+            apis
         } catch (_: Exception) {
-            null
+            emptyList()
         }
     }
 

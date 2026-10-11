@@ -1152,7 +1152,7 @@ class FlipperBleService : Service() {
                     } else {
                         BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE
                     }
-                    val started = gatt.writeDescriptor(descriptor)
+                    val started = writeDescriptorCompat(gatt, descriptor, descriptor.value ?: byteArrayOf())
                     if (!started) {
                         pendingConnectedDevice = null
                         _connectionState.value = ConnectionState.Error("Failed to enable Flipper notifications")
@@ -1173,7 +1173,14 @@ class FlipperBleService : Service() {
         ) {
             if (!isCurrentGatt(gatt)) return
             if (descriptor.uuid != CLIENT_CHARACTERISTIC_CONFIG) return
-            if (descriptor.characteristic?.uuid != serialRxCharacteristic?.uuid) return
+            val writtenCharacteristic = descriptor.characteristic?.uuid
+            if (writtenCharacteristic == serialOverflowCharacteristic?.uuid) {
+                if (status == BluetoothGatt.GATT_SUCCESS) {
+                    serialOverflowCharacteristic?.let { refreshOverflowCapacity(it) }
+                }
+                return
+            }
+            if (writtenCharacteristic != serialRxCharacteristic?.uuid) return
 
             if (status != BluetoothGatt.GATT_SUCCESS) {
                 pendingConnectedDevice = null
@@ -1278,6 +1285,10 @@ class FlipperBleService : Service() {
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 flipperProtocol.onWriteComplete()
             } else {
+                if (status == GATT_INSUFFICIENT_AUTHENTICATION || status == GATT_INSUFFICIENT_ENCRYPTION) {
+                    requestBondIfNeeded()
+                    lastWriteFailureReason = "Flipper BLE link is not paired (GATT $status). Accept the pairing prompt on both devices."
+                }
                 flipperProtocol.onWriteError(status)
             }
         }
@@ -1411,10 +1422,12 @@ class FlipperBleService : Service() {
                             val ack = if (requiresAck) CompletableDeferred<Boolean>() else null
                             pendingWriteAck = ack
 
-                            characteristic.value = chunkData
-                            characteristic.writeType = writeType
-
-                            val started = gatt.writeCharacteristic(characteristic)
+                            val started = writeCharacteristicCompat(
+                                gatt = gatt,
+                                characteristic = characteristic,
+                                value = chunkData,
+                                writeType = writeType
+                            )
                             if (!started) {
                                 pendingWriteAck = null
                                 lastWriteFailureReason = "Gatt rejected write " +
@@ -1501,9 +1514,8 @@ class FlipperBleService : Service() {
     }
 
     private fun updateOverflowCapacityFromBytes(bytes: ByteArray) {
-        if (bytes.size < OVERFLOW_VALUE_SIZE_BYTES) return
-        val remaining = java.nio.ByteBuffer.wrap(bytes.copyOfRange(0, OVERFLOW_VALUE_SIZE_BYTES)).int
-        remainingSerialBufferBytes = remaining.coerceAtLeast(0)
+        val remaining = SerialFlowControl.remainingBytes(bytes) ?: return
+        remainingSerialBufferBytes = remaining
     }
 
     private suspend fun waitForOverflowBudget(requiredBytes: Int): Boolean {
@@ -1680,6 +1692,44 @@ class FlipperBleService : Service() {
             ?: characteristics.firstOrNull { supportsNotifyOrIndicate(it) }
     }
 
+    @SuppressLint("MissingPermission")
+    private fun writeCharacteristicCompat(
+        gatt: BluetoothGatt,
+        characteristic: BluetoothGattCharacteristic,
+        value: ByteArray,
+        writeType: Int
+    ): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            gatt.writeCharacteristic(characteristic, value, writeType) == BluetoothStatusCodes.SUCCESS
+        } else {
+            characteristic.value = value
+            characteristic.writeType = writeType
+            gatt.writeCharacteristic(characteristic)
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun writeDescriptorCompat(
+        gatt: BluetoothGatt,
+        descriptor: BluetoothGattDescriptor,
+        value: ByteArray
+    ): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            gatt.writeDescriptor(descriptor, value) == BluetoothStatusCodes.SUCCESS
+        } else {
+            descriptor.value = value
+            gatt.writeDescriptor(descriptor)
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun requestBondIfNeeded() {
+        if (!hasBluetoothPermissions()) return
+        val device = bluetoothGatt?.device ?: lastRequestedBluetoothDevice ?: return
+        if (device.bondState == BluetoothDevice.BOND_BONDED) return
+        runCatching { device.createBond() }
+    }
+
     private fun supportsWrite(characteristic: BluetoothGattCharacteristic): Boolean {
         val props = characteristic.properties
         return props and BluetoothGattCharacteristic.PROPERTY_WRITE != 0 ||
@@ -1770,12 +1820,14 @@ class FlipperBleService : Service() {
         gatt.setCharacteristicNotification(overflowCharacteristic, true)
         val descriptor = overflowCharacteristic.getDescriptor(CLIENT_CHARACTERISTIC_CONFIG)
         if (descriptor != null && supportsNotifyOrIndicate(overflowCharacteristic)) {
-            descriptor.value = if (supportsNotification(overflowCharacteristic)) {
+            val value = if (supportsNotification(overflowCharacteristic)) {
                 BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
             } else {
                 BluetoothGattDescriptor.ENABLE_INDICATION_VALUE
             }
-            gatt.writeDescriptor(descriptor)
+            descriptor.value = value
+            writeDescriptorCompat(gatt, descriptor, value)
+            return
         }
         refreshOverflowCapacity(overflowCharacteristic)
     }
@@ -1830,6 +1882,11 @@ class FlipperBleService : Service() {
 
     fun isCommandTransportConnected(): Boolean {
         return isUsbCommandTransportConnected() || isBleCommandTransportConnected()
+    }
+
+    /** True while command bytes go to the Flipper BLE serial pipe, which is RPC. */
+    fun isBleSerialTransport(): Boolean {
+        return activeTransport == CommandTransport.BLE && gattLinkConnected
     }
 
     private fun isBleCommandTransportConnected(): Boolean {
@@ -2169,9 +2226,12 @@ class FlipperBleService : Service() {
             withContext(Dispatchers.IO) {
                 val ack = CompletableDeferred<Boolean>()
                 pendingWriteAck = ack
-                resetCharacteristic.value = byteArrayOf(0)
-                resetCharacteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-                val started = gatt.writeCharacteristic(resetCharacteristic)
+                val started = writeCharacteristicCompat(
+                    gatt = gatt,
+                    characteristic = resetCharacteristic,
+                    value = byteArrayOf(0),
+                    writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                )
                 if (!started) {
                     pendingWriteAck = null
                     return@withContext false
@@ -2513,6 +2573,8 @@ class FlipperBleService : Service() {
         private const val GATT_STATUS_CONN_TERMINATE_LOCAL_HOST = 22
         private const val GATT_STATUS_GENERIC_ERROR = 133
         private const val GATT_STATUS_FAILURE = 257
+        private const val GATT_INSUFFICIENT_AUTHENTICATION = 5
+        private const val GATT_INSUFFICIENT_ENCRYPTION = 15
         private const val USB_PERMISSION_TIMEOUT_MS = 4_000L
         private const val USB_READ_TIMEOUT_MS = 120L
         private const val USB_WRITE_TIMEOUT_MS = 1_500L

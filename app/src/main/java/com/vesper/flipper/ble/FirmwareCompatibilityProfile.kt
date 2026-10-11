@@ -40,6 +40,33 @@ data class FirmwareCommandCompatibility(
     val message: String
 )
 
+/**
+ * Names a custom firmware from a version banner or device-info blob.
+ * A generic "Flipper" / "firmware" string is not enough to call it stock.
+ */
+object FirmwareIdentity {
+    fun detect(text: String?): FirmwareFamily? {
+        val hint = text?.lowercase().orEmpty()
+        if (hint.isBlank()) return null
+        return when {
+            hint.contains("momentum") || hint.contains("mntm") -> FirmwareFamily.MOMENTUM
+            hint.contains("unleashed") || hint.contains("unlshd") -> FirmwareFamily.UNLEASHED
+            hint.contains("roguemaster") || hint.contains("rogue master") -> FirmwareFamily.ROGUEMASTER
+            hint.contains("xtreme") -> FirmwareFamily.XTREME
+            else -> null
+        }
+    }
+
+    fun looksOfficial(text: String?): Boolean {
+        val hint = text?.lowercase()?.trim().orEmpty()
+        if (hint.isBlank() || detect(text) != null) return false
+        if (hint.contains("official") || hint.contains("ofw")) return true
+        return STOCK_VERSION.containsMatchIn(hint)
+    }
+
+    private val STOCK_VERSION = Regex("""\b\d+\.\d+\.\d+(?:-rc)?\b""")
+}
+
 object FirmwareCompatibilityLayer {
 
     fun assessCliCommand(

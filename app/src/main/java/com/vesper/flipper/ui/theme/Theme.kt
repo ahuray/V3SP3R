@@ -32,8 +32,8 @@ val VesperOrange = VesperWine
 val VesperOrangeDark = VesperWineDark
 
 // Secondary: Cyan Steel — cold data accent
-val VesperSecondary = Color(0xFF0E1613)      // Near-black panel, green-tinted
-val VesperGunmetal = Color(0xFF18231E)       // Lifted panel
+val VesperSecondary = Color(0xFF24312B)      // Lifted panel, green-tinted
+val VesperGunmetal = Color(0xFF2E3D35)       // Lifted panel
 val VesperCyan = Color(0xFF34E7E4)           // Data cyan for secondary accents
 
 // Accent: CRT Amber — attention / warning glow
@@ -41,12 +41,12 @@ val VesperAccent = Color(0xFFF4B740)         // CRT amber
 val VesperGold = Color(0xFFF4B740)
 val VesperGoldMuted = Color(0xFFB7891F)      // Muted amber for secondary accents
 
-// Surface Colors — deep terminal black
-val VesperSurface = Color(0xFF0A110E)
-val VesperSurfaceVariant = Color(0xFF101A15)
-val VesperBackground = Color(0xFF060A08)
-val VesperBackgroundDeep = Color(0xFF030605)
-val VesperBackgroundGlow = Color(0xFF07130D)   // Very subtle phosphor glow
+// Surface Colors — lifted terminal charcoal so body text stays readable on a phone.
+val VesperSurface = Color(0xFF24312B)
+val VesperSurfaceVariant = Color(0xFF2E3D35)
+val VesperBackground = Color(0xFF1A2621)
+val VesperBackgroundDeep = Color(0xFF14201C)
+val VesperBackgroundGlow = Color(0xFF1E3329)
 
 val VesperBackdropBrush = Brush.verticalGradient(
     colors = listOf(
@@ -71,9 +71,9 @@ val DiffAddedBackground = Color(0x332DE37E)
 val DiffRemovedBackground = Color(0x33FF5C66)
 
 // Chat Colors — distinct from system
-val ChatAssistant = Color(0xFF101A15)       // Dark panel bubble
+val ChatAssistant = Color(0xFF2E3D35)       // Panel bubble
 val ChatUser = VesperWineDark                // Deep-green bubble for user
-val ChatTool = Color(0xFF0A120E)             // Even darker for tool results
+val ChatTool = Color(0xFF24312B)             // Tool results
 val ChatToolAccent = VesperGold              // Amber for tool highlights
 
 private val DarkColorScheme = darkColorScheme(
@@ -88,13 +88,13 @@ private val DarkColorScheme = darkColorScheme(
     tertiary = VesperGold,
     onTertiary = Color(0xFF1A1300),
     background = VesperBackground,
-    onBackground = Color(0xFFD7E4DD),
+    onBackground = Color(0xFFF4FBF7),
     surface = VesperSurface,
-    onSurface = Color(0xFFD7E4DD),
+    onSurface = Color(0xFFF4FBF7),
     surfaceVariant = VesperSurfaceVariant,
-    onSurfaceVariant = Color(0xFF7C8F86),
-    outline = Color(0xFF243029),
-    outlineVariant = Color(0xFF18211C),
+    onSurfaceVariant = Color(0xFFD5E6DC),
+    outline = Color(0xFF7FA08F),
+    outlineVariant = Color(0xFF4E675C),
     error = RiskHigh,
     onError = Color(0xFF200909)
 )

@@ -393,14 +393,14 @@ class FlipperProtocol @Inject constructor() {
         operation = "list directory",
         onTimeout = { ProtocolResponse.Error("Command pipeline busy while listing directory: $path") }
     ) {
-        sendRpcListDirectoryLocked(path) ?: sendLegacyListDirectoryLocked(path)
+        sendRpcListDirectoryLocked(path) ?: bleLegacyBlocked("directory list") ?: sendLegacyListDirectoryLocked(path)
     }
 
     suspend fun readFile(path: String): ProtocolResponse = withCommandLock(
         operation = "read file",
         onTimeout = { ProtocolResponse.Error("Command pipeline busy while reading file: $path") }
     ) {
-        when (val response = sendRpcReadFileLocked(path) ?: sendLegacyReadFileLocked(path)) {
+        when (val response = sendRpcReadFileLocked(path) ?: bleLegacyBlocked("file read") ?: sendLegacyReadFileLocked(path)) {
             is ProtocolResponse.BinaryContent -> {
                 ProtocolResponse.FileContent(response.data.toString(Charsets.UTF_8))
             }
@@ -412,49 +412,49 @@ class FlipperProtocol @Inject constructor() {
         operation = "read file binary",
         onTimeout = { ProtocolResponse.Error("Command pipeline busy while reading binary file: $path") }
     ) {
-        sendRpcReadFileLocked(path) ?: sendLegacyReadFileLocked(path)
+        sendRpcReadFileLocked(path) ?: bleLegacyBlocked("file read") ?: sendLegacyReadFileLocked(path)
     }
 
     suspend fun writeFile(path: String, content: ByteArray): ProtocolResponse = withCommandLock(
         operation = "write file",
         onTimeout = { ProtocolResponse.Error("Command pipeline busy while writing file: $path") }
     ) {
-        sendRpcWriteFileLocked(path, content) ?: sendLegacyWriteFileLocked(path, content)
+        sendRpcWriteFileLocked(path, content) ?: bleLegacyBlocked("file write") ?: sendLegacyWriteFileLocked(path, content)
     }
 
     suspend fun createDirectory(path: String): ProtocolResponse = withCommandLock(
         operation = "create directory",
         onTimeout = { ProtocolResponse.Error("Command pipeline busy while creating directory: $path") }
     ) {
-        sendRpcCreateDirectoryLocked(path) ?: sendLegacyCreateDirectoryLocked(path)
+        sendRpcCreateDirectoryLocked(path) ?: bleLegacyBlocked("mkdir") ?: sendLegacyCreateDirectoryLocked(path)
     }
 
     suspend fun delete(path: String, recursive: Boolean = false): ProtocolResponse = withCommandLock(
         operation = "delete path",
         onTimeout = { ProtocolResponse.Error("Command pipeline busy while deleting: $path") }
     ) {
-        sendRpcDeleteLocked(path, recursive) ?: sendLegacyDeleteLocked(path, recursive)
+        sendRpcDeleteLocked(path, recursive) ?: bleLegacyBlocked("delete") ?: sendLegacyDeleteLocked(path, recursive)
     }
 
     suspend fun move(sourcePath: String, destPath: String): ProtocolResponse = withCommandLock(
         operation = "move path",
         onTimeout = { ProtocolResponse.Error("Command pipeline busy while moving: $sourcePath -> $destPath") }
     ) {
-        sendRpcMoveLocked(sourcePath, destPath) ?: sendLegacyMoveLocked(sourcePath, destPath)
+        sendRpcMoveLocked(sourcePath, destPath) ?: bleLegacyBlocked("move") ?: sendLegacyMoveLocked(sourcePath, destPath)
     }
 
     suspend fun getDeviceInfo(): ProtocolResponse = withCommandLock(
         operation = "get device info",
         onTimeout = { ProtocolResponse.Error("Command pipeline busy while requesting device info") }
     ) {
-        sendRpcDeviceInfoLocked() ?: sendLegacyDeviceInfoLocked()
+        sendRpcDeviceInfoLocked() ?: bleLegacyBlocked("device info") ?: sendLegacyDeviceInfoLocked()
     }
 
     suspend fun getStorageInfo(): ProtocolResponse = withCommandLock(
         operation = "get storage info",
         onTimeout = { ProtocolResponse.Error("Command pipeline busy while requesting storage info") }
     ) {
-        sendRpcStorageInfoLocked() ?: sendLegacyStorageInfoLocked()
+        sendRpcStorageInfoLocked() ?: bleLegacyBlocked("storage info") ?: sendLegacyStorageInfoLocked()
     }
 
     private suspend fun sendLegacyListDirectoryLocked(path: String): ProtocolResponse {
@@ -592,6 +592,19 @@ class FlipperProtocol @Inject constructor() {
     private suspend fun ensureTransportConnected(service: FlipperBleService): Boolean {
         if (service.isCommandTransportConnected()) return true
         return service.awaitCommandTransportReady()
+    }
+
+    /**
+     * BLE serial is opened as an RPC session by the Flipper BT service. A legacy
+     * length-prefixed frame, or CLI text such as `start_rpc_session`, is fed
+     * straight into the protobuf parser and the rest of the link stops answering.
+     * Returning a non-null response skips that fallback on Bluetooth.
+     */
+    private fun bleLegacyBlocked(operation: String): ProtocolResponse? {
+        if (bleService?.isBleSerialTransport() != true) return null
+        return ProtocolResponse.Error(
+            "Bluetooth serial is an RPC session, so the legacy $operation frame was not sent."
+        )
     }
 
     private suspend fun sendRpcListDirectoryLocked(path: String): ProtocolResponse? {
@@ -912,6 +925,7 @@ class FlipperProtocol @Inject constructor() {
         if (deviceInfoPairs.isEmpty()) {
             return null
         }
+        learnFirmwareFromInfoMap(deviceInfoPairs)
         val powerInfoPairs = requestPowerInfoMapLocked()
 
         val deviceName = firstNonBlank(
@@ -1478,6 +1492,14 @@ class FlipperProtocol @Inject constructor() {
      */
     suspend fun sendCliCommand(command: String): ProtocolResponse {
         val normalizedCommand = normalizeCliCommand(command)
+        if (bleService?.isBleSerialTransport() == true) {
+            if (hasRpcAppCommandMapping(normalizedCommand)) {
+                return executeRpcAppCommand(normalizedCommand)
+            }
+            return ProtocolResponse.Error(
+                "Bluetooth is an RPC session on this firmware, so CLI text \"$normalizedCommand\" was not sent."
+            )
+        }
         val commandVariants = buildCliCommandVariants(normalizedCommand)
 
         var lastResponse: ProtocolResponse = ProtocolResponse.Error("No response")
@@ -1738,6 +1760,9 @@ class FlipperProtocol @Inject constructor() {
                 markCliUnavailable("Flipper command transport is not connected")
                 return@withCommandLock false
             }
+            if (service.isBleSerialTransport()) {
+                return@withCommandLock false
+            }
             val data = "$text\r\n".toByteArray(Charsets.UTF_8)
             val sent = service.sendData(data)
             if (!sent) {
@@ -1766,6 +1791,15 @@ class FlipperProtocol @Inject constructor() {
         val service = bleService ?: return@withCommandLock markCliUnavailable("Device service unavailable")
         if (!ensureTransportConnected(service)) {
             return@withCommandLock markCliUnavailable("Flipper command transport is not connected")
+        }
+
+        if (service.isBleSerialTransport()) {
+            return@withCommandLock probeRpcTransportAvailability(
+                detail = "RPC ping responded on BLE serial"
+            ) ?: markCliUnavailable(
+                "BLE serial did not answer an RPC ping. This link speaks protobuf RPC, not the text CLI. " +
+                    "Reconnect the Flipper and close other apps that are using it."
+            )
         }
 
         val now = System.currentTimeMillis()
@@ -1865,6 +1899,11 @@ class FlipperProtocol @Inject constructor() {
         val service = bleService ?: return markCliUnavailable("Device service unavailable")
         if (!ensureTransportConnected(service)) {
             return markCliUnavailable("Flipper command transport is not connected")
+        }
+        if (service.isBleSerialTransport()) {
+            return probeRpcTransportAvailability(
+                "BLE serial stays on RPC; the text CLI is not available on this pipe"
+            ) ?: currentStatusOrUnavailable("BLE RPC ping did not respond.")
         }
 
         val current = _cliStatus.value
@@ -3169,6 +3208,11 @@ class FlipperProtocol @Inject constructor() {
                 markCliUnavailable("Flipper command transport is not connected")
             }
         }
+        if (service.isBleSerialTransport()) {
+            return@withCommandLock ProtocolResponse.Error(
+                "Bluetooth serial is RPC-only, so CLI text was not sent: $command"
+            )
+        }
 
         val responseText = collectRawCliResponse("$command\r\n", RAW_CLI_TIMEOUT_MS)
         if (responseText.isNotBlank() && isLikelyCliText(responseText)) {
@@ -3362,6 +3406,16 @@ class FlipperProtocol @Inject constructor() {
             return firstAttempt
         }
 
+        if (bleService?.isBleSerialTransport() == true) {
+            delay(RPC_SESSION_START_DELAY_MS)
+            val retryTimeoutMs = timeoutMs.coerceAtMost(RPC_RETRY_COMMAND_TIMEOUT_MS)
+            return collectRpcMainResponsesOnce(
+                request = request,
+                commandId = commandId,
+                timeoutMs = retryTimeoutMs
+            )
+        }
+
         val restarted = tryStartRpcSession()
         if (!restarted) {
             return emptyList()
@@ -3425,6 +3479,11 @@ class FlipperProtocol @Inject constructor() {
 
     private suspend fun tryStartRpcSession(): Boolean {
         val service = bleService ?: return false
+        // BLE serial is already an RPC session. `start_rpc_session` is CLI text
+        // and would be parsed as a broken protobuf frame.
+        if (service.isBleSerialTransport()) {
+            return false
+        }
         val sessionCommands = listOf(
             "start_rpc_session\r",
             "start_rpc_session\r\n",
@@ -3446,6 +3505,9 @@ class FlipperProtocol @Inject constructor() {
         }
         if (framedStop?.commandStatus == Flipper.CommandStatus.OK) {
             return true
+        }
+        if (bleService?.isBleSerialTransport() == true) {
+            return false
         }
 
         val service = bleService ?: return false
@@ -3589,7 +3651,7 @@ class FlipperProtocol @Inject constructor() {
             checkedAtMs = System.currentTimeMillis(),
             supportsCli = previous.supportsCli,
             supportsRpc = true,
-            firmwareHint = null,
+            firmwareHint = previous.firmwareHint,
             details = detail
         )
         _cliStatus.value = status
@@ -3689,16 +3751,51 @@ class FlipperProtocol @Inject constructor() {
     }
 
     private fun learnFirmwareProfile(response: ProtocolResponse) {
+        applyDetectedFamily(FirmwareIdentity.detect(extractResponseText(response)))
+    }
+
+    private fun learnFirmwareFromInfoMap(pairs: Map<String, String>) {
+        val described = buildString {
+            listOf(
+                "firmware_origin",
+                "firmware_branch",
+                "firmware_version",
+                "firmware_commit",
+                "firmware"
+            ).forEach { key ->
+                val value = pairs[normalizeInfoKey(key)] ?: return@forEach
+                append(key)
+                append('=')
+                append(value)
+                append(' ')
+            }
+        }
+        val versionHint = pairs[normalizeInfoKey("firmware_version")]
+            ?: pairs[normalizeInfoKey("firmware_branch")]
+            ?: pairs[normalizeInfoKey("firmware_origin")]
+        if (!versionHint.isNullOrBlank()) {
+            _cliStatus.value = _cliStatus.value.copy(firmwareHint = versionHint)
+        }
+        applyDetectedFamily(FirmwareIdentity.detect(described))
+        refreshFirmwareCompatibility()
+    }
+
+    private fun applyDetectedFamily(family: FirmwareFamily?) {
         if (firmwareProfile != FirmwareProfile.UNKNOWN) return
-        val text = extractResponseText(response).lowercase()
-        firmwareProfile = when {
-            text.contains("momentum") || text.contains("mntm") -> FirmwareProfile.MOMENTUM
-            text.contains("unleashed") -> FirmwareProfile.UNLEASHED
-            text.contains("roguemaster") || text.contains("rogue master") -> FirmwareProfile.ROGUEMASTER
-            text.contains("xtreme") -> FirmwareProfile.XTREME
-            else -> firmwareProfile
+        firmwareProfile = when (family) {
+            FirmwareFamily.MOMENTUM -> FirmwareProfile.MOMENTUM
+            FirmwareFamily.UNLEASHED -> FirmwareProfile.UNLEASHED
+            FirmwareFamily.ROGUEMASTER -> FirmwareProfile.ROGUEMASTER
+            FirmwareFamily.XTREME -> FirmwareProfile.XTREME
+            else -> return
         }
         refreshFirmwareCompatibility()
+    }
+
+    private fun currentStatusOrUnavailable(reason: String): CliCapabilityStatus {
+        val current = _cliStatus.value
+        if (current.level == CliCapabilityLevel.READY) return current
+        return markCliUnavailable(reason)
     }
 
     private fun refreshFirmwareCompatibility() {
@@ -3755,16 +3852,12 @@ class FlipperProtocol @Inject constructor() {
             FirmwareProfile.ROGUEMASTER -> FirmwareFamily.ROGUEMASTER
             FirmwareProfile.XTREME -> FirmwareFamily.XTREME
             FirmwareProfile.UNKNOWN -> {
-                val hint = firmwareHint?.lowercase().orEmpty()
-                when {
-                    hint.contains("momentum") || hint.contains("mntm") -> FirmwareFamily.MOMENTUM
-                    hint.contains("unleashed") -> FirmwareFamily.UNLEASHED
-                    hint.contains("roguemaster") || hint.contains("rogue master") -> FirmwareFamily.ROGUEMASTER
-                    hint.contains("xtreme") -> FirmwareFamily.XTREME
-                    hint.contains("flipper") || hint.contains("fw") || hint.contains("firmware") ->
+                FirmwareIdentity.detect(firmwareHint)
+                    ?: if (FirmwareIdentity.looksOfficial(firmwareHint)) {
                         FirmwareFamily.OFFICIAL
-                    else -> FirmwareFamily.UNKNOWN
-                }
+                    } else {
+                        FirmwareFamily.UNKNOWN
+                    }
             }
         }
     }
