@@ -219,6 +219,42 @@ enum class LlmProvider(
         sendsAttributionHeaders = false,
         usesMaxCompletionTokens = false,
         allowsSamplingTemperature = true
+    ),
+    ANTHROPIC(
+        id = "anthropic",
+        displayName = "Anthropic",
+        summary = "Cloud Claude API",
+        keyLabel = "Anthropic API Key",
+        keyHint = "Paste your Anthropic key (starts with sk-ant-).",
+        chatCompletionsUrl = "https://api.anthropic.com/v1/chat/completions",
+        modelsUrl = "https://api.anthropic.com/v1/models",
+        apiHost = "api.anthropic.com",
+        defaultModel = "claude-sonnet-5-5",
+        models = listOf(
+            ModelInfo("claude-sonnet-5-5", "Claude Sonnet 5.5", "Best default for tools and code"),
+            ModelInfo("claude-haiku-5-5", "Claude Haiku 5.5", "Fast, low cost"),
+            ModelInfo("claude-opus-5-5", "Claude Opus 5.5", "Most capable"),
+            ModelInfo("claude-sonnet-4-6", "Claude Sonnet 4.6", "Stable tool-calling fallback"),
+            ModelInfo("claude-haiku-4-5", "Claude Haiku 4.5", "Cheaper fallback")
+        ),
+        visionModels = listOf(
+            "claude-sonnet-5-5",
+            "claude-haiku-5-5",
+            "claude-opus-5-5"
+        ),
+        toolFallbackModels = listOf(
+            "claude-sonnet-5-5",
+            "claude-haiku-5-5",
+            "claude-sonnet-4-6",
+            "claude-opus-5-5"
+        ),
+        knownNonToolModels = emptySet(),
+        speechBackend = SpeechBackend.NONE,
+        speechSummary = "Claude chat only. This provider has no speech endpoint.",
+        voices = listOf(LlmVoice("none", "None", "Speech is not available")),
+        sendsAttributionHeaders = false,
+        usesMaxCompletionTokens = false,
+        allowsSamplingTemperature = false
     );
 
     val apiKeyPreference: String
@@ -227,6 +263,7 @@ enum class LlmProvider(
             GEMINI -> "gemini_api_key"
             OPENAI -> "openai_api_key"
             XAI -> "xai_api_key"
+            ANTHROPIC -> "anthropic_api_key"
         }
 
     val modelPreference: String
@@ -235,6 +272,7 @@ enum class LlmProvider(
             GEMINI -> "selected_model_gemini"
             OPENAI -> "selected_model_openai"
             XAI -> "selected_model_xai"
+            ANTHROPIC -> "selected_model_anthropic"
         }
 
     fun voiceOrDefault(storedId: String): LlmVoice {
@@ -283,6 +321,8 @@ enum class LlmProvider(
                     BLOCKED_MODEL_MARKERS.none { id.contains(it) } &&
                     !id.contains("imagine") &&
                     !id.contains("voice")
+            ANTHROPIC -> id.startsWith("claude-") &&
+                    BLOCKED_MODEL_MARKERS.none { id.contains(it) }
         }
     }
 
@@ -342,7 +382,8 @@ enum class SpeechBackend {
     OPENROUTER_AUDIO,
     OPENAI_SPEECH,
     GEMINI_TTS,
-    XAI_TTS
+    XAI_TTS,
+    NONE
 }
 
 data class LlmVoice(

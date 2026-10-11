@@ -55,7 +55,7 @@ fun SpectralOracleScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(brush = VesperBackdropBrush)
+            .background(brush = vesperPageBrush())
     ) {
         // Animated background effect
         OracleBackground(isAnalyzing = isAnalyzing)
@@ -229,7 +229,7 @@ private fun OracleHeader() {
                 "SPECTRAL ORACLE",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Black,
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onBackground,
                 letterSpacing = 4.sp
             )
             Text(

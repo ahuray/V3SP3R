@@ -82,6 +82,8 @@ class OpenRouterTtsService @Inject constructor(
                         SpeechBackend.OPENAI_SPEECH -> speakOpenAi(apiKey, voiceId, text)
                         SpeechBackend.GEMINI_TTS -> speakGemini(apiKey, voiceId, text)
                         SpeechBackend.XAI_TTS -> speakXai(apiKey, voiceId, text)
+                        SpeechBackend.NONE ->
+                            _state.value = TtsState.Error("This provider has no speech endpoint.")
                     }
                 } catch (e: CancellationException) {
                     throw e

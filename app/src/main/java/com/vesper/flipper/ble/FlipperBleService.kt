@@ -1311,7 +1311,9 @@ class FlipperBleService : Service() {
         return if (isUsbCommandTransportConnected()) {
             sendDataOverUsb(data, preferNoResponse)
         } else {
-            sendDataOverBle(data, preferNoResponse, ignoreOverflowBudget)
+            val skipOverflow = ignoreOverflowBudget ||
+                !SerialFlowControl.waitsForOverflowBudget(data.size)
+            sendDataOverBle(data, preferNoResponse, skipOverflow)
         }
     }
 

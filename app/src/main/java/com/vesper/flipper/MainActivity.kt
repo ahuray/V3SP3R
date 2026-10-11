@@ -29,7 +29,7 @@ import androidx.navigation.compose.rememberNavController
 import com.vesper.flipper.ble.FlipperBleService
 import com.vesper.flipper.data.SettingsStore
 import com.vesper.flipper.ui.screen.*
-import com.vesper.flipper.ui.theme.VesperBackdropBrush
+import com.vesper.flipper.ui.theme.vesperPageBrush
 import com.vesper.flipper.ui.theme.VesperTheme
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -128,7 +128,7 @@ fun VesperApp() {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(VesperBackdropBrush)
+            .background(vesperPageBrush())
     ) {
         Scaffold(
             containerColor = Color.Transparent,
@@ -147,7 +147,8 @@ fun VesperApp() {
                         Screen.Oracle.route to Screen.Device.route,
                         Screen.Arsenal.route to Screen.Device.route,
                         Screen.PayloadLab.route to Screen.Device.route,
-                        Screen.StageRemote.route to Screen.Device.route
+                        Screen.StageRemote.route to Screen.Device.route,
+                        Screen.OpsCenter.route to Screen.Device.route
                     )
                     val currentRoute = currentDestination?.route
                     val effectiveRoute = subScreenParents[currentRoute] ?: currentRoute
@@ -237,6 +238,12 @@ fun VesperApp() {
                         },
                         onNavigateToStageRemote = {
                             navController.navigate(Screen.StageRemote.route)
+                        },
+                        onNavigateToOps = {
+                            navController.navigate(Screen.OpsCenter.route)
+                        },
+                        onNavigateToAudit = {
+                            navController.navigate(Screen.Audit.route)
                         }
                     )
                 }

@@ -23,6 +23,9 @@ class FlipperFileSystem @Inject constructor(
     val firmwareCompatibility: StateFlow<FirmwareCompatibilityProfile>
         get() = protocol.firmwareCompatibility
 
+    val screenFrame: StateFlow<FlipperScreenImage?>
+        get() = protocol.screenFrame
+
     private val _autotuneStatus = MutableStateFlow(CommandPipelineAutotuneStatus())
     val autotuneStatus: StateFlow<CommandPipelineAutotuneStatus> = _autotuneStatus.asStateFlow()
     private val autotuneWindow = ArrayDeque<AutotuneSample>()
@@ -434,6 +437,52 @@ class FlipperFileSystem @Inject constructor(
             is ProtocolResponse.Error -> Result.failure(FlipperException(response.message, response.code))
             else -> Result.failure(FlipperException("Unexpected response type"))
         }
+    }
+
+    /**
+     * @return true when Back must not be sent. The desktop was locked and the
+     * unlock already woke it; a Back short would lock it again.
+     */
+    suspend fun wakeDesktopBeforeRemoteKey(button: FlipperRemoteButton): Boolean {
+        return protocol.wakeDesktopBeforeRemoteKey(button.toGuiInputKey())
+    }
+
+    /**
+     * Send one GUI input event and wait until the Flipper acknowledges it.
+     * Short and long events only count while a press for that key is still held.
+     */
+    suspend fun sendRemoteInputStep(
+        button: FlipperRemoteButton,
+        inputType: Gui.InputType
+    ): Result<String> {
+        return protocolResponseToStringResult(
+            protocol.sendGuiInputStep(
+                key = button.toGuiInputKey(),
+                inputType = inputType
+            )
+        )
+    }
+
+    /**
+     * Play a hold gesture as one ordered write. The sender returns false when
+     * the packet was not written. Release is added if a press went out and the
+     * caller did not release it.
+     */
+    suspend fun playRemoteGesture(
+        button: FlipperRemoteButton,
+        play: suspend (send: suspend (Gui.InputType) -> Boolean) -> Unit
+    ): Result<String> {
+        return protocolResponseToStringResult(
+            protocol.playRemoteGesture(button.toGuiInputKey(), play)
+        )
+    }
+
+    suspend fun startScreenStream(): Result<String> {
+        return protocolResponseToStringResult(protocol.startScreenStream())
+    }
+
+    suspend fun stopScreenStream(): Result<String> {
+        return protocolResponseToStringResult(protocol.stopScreenStream())
     }
 
     private fun String.normalizePath(): String {

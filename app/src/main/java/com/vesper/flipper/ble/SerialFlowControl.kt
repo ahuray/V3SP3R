@@ -11,6 +11,16 @@ import java.nio.ByteOrder
 object SerialFlowControl {
     const val MAX_REASONABLE_BYTES = 64 * 1024
 
+    /**
+     * Button and screen-control packets are much smaller than a storage chunk.
+     * A stale RX-budget estimate must not hold them while screen frames are arriving.
+     */
+    const val CONTROL_WRITE_MAX_BYTES = 96
+
+    fun waitsForOverflowBudget(payloadSize: Int): Boolean {
+        return payloadSize > CONTROL_WRITE_MAX_BYTES
+    }
+
     fun remainingBytes(value: ByteArray): Int? {
         if (value.size < 4) return null
         val head = value.copyOfRange(0, 4)

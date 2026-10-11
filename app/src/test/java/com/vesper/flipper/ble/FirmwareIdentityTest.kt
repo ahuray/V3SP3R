@@ -38,4 +38,14 @@ class SerialFlowControlTest {
         // 1024 little-endian. Big-endian of these bytes is 262144, past the serial buffer.
         assertEquals(1024, SerialFlowControl.remainingBytes(byteArrayOf(0x00, 0x04, 0x00, 0x00)))
     }
+
+    @Test
+    fun `a remote button packet does not wait on the serial budget`() {
+        assertFalse(SerialFlowControl.waitsForOverflowBudget(32))
+    }
+
+    @Test
+    fun `a storage chunk still waits on the serial budget`() {
+        assertTrue(SerialFlowControl.waitsForOverflowBudget(512))
+    }
 }

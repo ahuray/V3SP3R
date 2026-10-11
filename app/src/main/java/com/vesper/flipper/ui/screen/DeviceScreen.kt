@@ -1,11 +1,19 @@
 package com.vesper.flipper.ui.screen
 
+import android.graphics.Bitmap
 import androidx.compose.animation.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -17,9 +25,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.Role
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.vesper.flipper.R
 import com.vesper.flipper.ble.CliCapabilityLevel
@@ -31,6 +50,8 @@ import com.vesper.flipper.ble.ConnectionState
 import com.vesper.flipper.ble.FirmwareCompatibilityProfile
 import com.vesper.flipper.ble.FirmwareTransportMode
 import com.vesper.flipper.ble.FlipperDevice
+import com.vesper.flipper.ble.FlipperScreenImage
+import com.vesper.flipper.ble.FlipperScreenOrientation
 import com.vesper.flipper.domain.model.FlipperRemoteButton
 import com.vesper.flipper.glasses.BridgeState
 import com.vesper.flipper.ui.theme.*
@@ -48,7 +69,9 @@ fun DeviceScreen(
     onNavigateToOracle: () -> Unit = {},
     onNavigateToArsenal: () -> Unit = {},
     onNavigateToPayloadLab: () -> Unit = {},
-    onNavigateToStageRemote: () -> Unit = {}
+    onNavigateToStageRemote: () -> Unit = {},
+    onNavigateToOps: () -> Unit = {},
+    onNavigateToAudit: () -> Unit = {}
 ) {
     val connectionState by viewModel.connectionState.collectAsState()
     val discoveredDevices by viewModel.discoveredDevices.collectAsState()
@@ -63,6 +86,18 @@ fun DeviceScreen(
     val firmwareCompatibility by viewModel.firmwareCompatibility.collectAsState()
     val isSendingRemoteInput by viewModel.isSendingRemoteInput.collectAsState()
     val remoteInputStatus by viewModel.remoteInputStatus.collectAsState()
+    val screenFrame by viewModel.screenFrame.collectAsState()
+    val screenStreamStatus by viewModel.screenStreamStatus.collectAsState()
+    val connected = connectionState is ConnectionState.Connected
+    var liveScreen by rememberSaveable { mutableStateOf(true) }
+
+    LaunchedEffect(connected, liveScreen) {
+        if (connected && liveScreen) viewModel.startScreenMirror()
+        else viewModel.stopScreenMirror()
+    }
+    DisposableEffect(Unit) {
+        onDispose { viewModel.stopScreenMirror() }
+    }
     val glassesEnabled by viewModel.glassesEnabled.collectAsState()
     val glassesBridgeState by viewModel.glassesBridgeState.collectAsState()
     val glassesBridgeUrl by viewModel.glassesBridgeUrl.collectAsState()
@@ -128,10 +163,40 @@ fun DeviceScreen(
             )
         }
     ) { padding ->
-        LazyColumn(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding),
+                .padding(padding)
+        ) {
+        if (connectionState is ConnectionState.Connected) {
+            RemoteControlCard(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 16.dp),
+                isSendingRemoteInput = isSendingRemoteInput,
+                statusText = remoteInputStatus,
+                screenFrame = screenFrame,
+                screenStatus = screenStreamStatus,
+                liveScreen = liveScreen,
+                onLiveScreenChange = { liveScreen = it },
+                onRetryScreen = { viewModel.startScreenMirror() },
+                onDisconnect = { viewModel.disconnect() },
+                onKeyDown = { button -> viewModel.remoteKeyDown(button) },
+                onKeyUp = { gestureId -> viewModel.remoteKeyUp(gestureId) },
+                onNavigateToFiles = onNavigateToFiles,
+                onNavigateToOracle = onNavigateToOracle,
+                onNavigateToArsenal = onNavigateToArsenal,
+                onNavigateToPayloadLab = onNavigateToPayloadLab,
+                onNavigateToStageRemote = onNavigateToStageRemote,
+                onNavigateToOps = onNavigateToOps,
+                onNavigateToAudit = onNavigateToAudit
+            )
+        }
+        if (connectionState !is ConnectionState.Connected) LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -142,6 +207,78 @@ fun DeviceScreen(
                     connectedDevice = connectedDevice,
                     onDisconnect = { viewModel.disconnect() }
                 )
+            }
+
+            item {
+                ScanSection(
+                    isScanning = connectionState is ConnectionState.Scanning,
+                    onStartScan = { viewModel.startScan() },
+                    onStopScan = { viewModel.stopScan() },
+                    onConnectUsb = { viewModel.connectUsb() }
+                )
+            }
+
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        "Discovered Devices",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        if (discoveredDevices.isEmpty()) {
+                            "None yet. Scan, then tap a Flipper here."
+                        } else {
+                            "Tap a Flipper to connect. The screen and the kit are below."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            if (discoveredDevices.isEmpty()) {
+                item {
+                    Text(
+                        "No Flipper in range.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                items(discoveredDevices) { device ->
+                    DeviceListItem(
+                        device = device,
+                        isConnecting = connectionState is ConnectionState.Connecting &&
+                            (connectionState as ConnectionState.Connecting).deviceName == device.name,
+                        onClick = { viewModel.connectToDevice(device) }
+                    )
+                }
+            }
+
+            item {
+                FiveGhostBriefCard()
+            }
+
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    FlipperKit(
+                        compact = false,
+                        scrollable = false,
+                        onNavigateToFiles = onNavigateToFiles,
+                        onNavigateToOracle = onNavigateToOracle,
+                        onNavigateToArsenal = onNavigateToArsenal,
+                        onNavigateToPayloadLab = onNavigateToPayloadLab,
+                        onNavigateToStageRemote = onNavigateToStageRemote,
+                        onNavigateToOps = onNavigateToOps,
+                        onNavigateToAudit = onNavigateToAudit,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
             }
 
             // Smart Glasses Bridge (only when enabled in Settings)
@@ -168,18 +305,6 @@ fun DeviceScreen(
                 )
             }
 
-            if (connectionState is ConnectionState.Connected) {
-                item {
-                    RemoteControlCard(
-                        isSendingRemoteInput = isSendingRemoteInput,
-                        statusText = remoteInputStatus,
-                        onSendButton = { button, longPress ->
-                            viewModel.sendRemoteButton(button, longPress)
-                        }
-                    )
-                }
-            }
-
             // Device Info Card (when connected)
             if (connectionState is ConnectionState.Connected && deviceInfo != null) {
                 item {
@@ -197,44 +322,7 @@ fun DeviceScreen(
                 }
             }
 
-            // Scan/Connect Section
-            if (connectionState !is ConnectionState.Connected) {
-                item {
-                    ScanSection(
-                        isScanning = connectionState is ConnectionState.Scanning,
-                        onStartScan = { viewModel.startScan() },
-                        onStopScan = { viewModel.stopScan() },
-                        onConnectUsb = { viewModel.connectUsb() }
-                    )
-                }
-
-                // Discovered Devices
-                if (discoveredDevices.isNotEmpty()) {
-                    item {
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(
-                                "Discovered Devices",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                "Showing Flipper devices only, including custom device names.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-
-                    items(discoveredDevices) { device ->
-                        DeviceListItem(
-                            device = device,
-                            isConnecting = connectionState is ConnectionState.Connecting &&
-                                    (connectionState as ConnectionState.Connecting).deviceName == device.name,
-                            onClick = { viewModel.connectToDevice(device) }
-                        )
-                    }
-                }
-            }
+        }
         }
     }
 }
@@ -837,20 +925,84 @@ private fun CommandAutomationStatusCard(
 private fun RemoteControlCard(
     isSendingRemoteInput: Boolean,
     statusText: String?,
-    onSendButton: (FlipperRemoteButton, Boolean) -> Unit
+    screenFrame: FlipperScreenImage?,
+    screenStatus: String?,
+    liveScreen: Boolean,
+    onLiveScreenChange: (Boolean) -> Unit,
+    onRetryScreen: () -> Unit,
+    onDisconnect: () -> Unit,
+    onKeyDown: (FlipperRemoteButton) -> Long?,
+    onKeyUp: (Long) -> Unit,
+    onNavigateToFiles: () -> Unit,
+    onNavigateToOracle: () -> Unit,
+    onNavigateToArsenal: () -> Unit,
+    onNavigateToPayloadLab: () -> Unit,
+    onNavigateToStageRemote: () -> Unit,
+    onNavigateToOps: () -> Unit,
+    onNavigateToAudit: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    val controlsEnabled = !isSendingRemoteInput
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        Card(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            if (liveScreen) {
+                FlipperScreenMirror(
+                    frame = screenFrame,
+                    status = screenStatus,
+                    onRetry = onRetryScreen,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(12.dp)
+                )
+            } else {
+                FlipperKit(
+                    compact = false,
+                    dense = true,
+                    onNavigateToFiles = onNavigateToFiles,
+                    onNavigateToOracle = onNavigateToOracle,
+                    onNavigateToArsenal = onNavigateToArsenal,
+                    onNavigateToPayloadLab = onNavigateToPayloadLab,
+                    onNavigateToStageRemote = onNavigateToStageRemote,
+                    onNavigateToOps = onNavigateToOps,
+                    onNavigateToAudit = onNavigateToAudit,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(12.dp)
+                )
+            }
+        }
+        if (liveScreen) {
+            FlipperKit(
+                compact = true,
+                onNavigateToFiles = onNavigateToFiles,
+                onNavigateToOracle = onNavigateToOracle,
+                onNavigateToArsenal = onNavigateToArsenal,
+                onNavigateToPayloadLab = onNavigateToPayloadLab,
+                onNavigateToStageRemote = onNavigateToStageRemote,
+                onNavigateToOps = onNavigateToOps,
+                onNavigateToAudit = onNavigateToAudit
+            )
+        }
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Row(
@@ -863,69 +1015,85 @@ private fun RemoteControlCard(
                     tint = VesperOrange
                 )
                 Spacer(modifier = Modifier.width(10.dp))
-                Column {
-                    Text(
-                        text = "Remote Buttons",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "Direct Flipper button control over RPC",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                Text(
+                    text = "Remote Buttons",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                TextButton(onClick = onDisconnect) {
+                    Text("Disconnect")
                 }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Start,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (liveScreen) "Live screen on" else "Live screen off",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Switch(
+                    checked = liveScreen,
+                    onCheckedChange = onLiveScreenChange
+                )
             }
 
             DPadRow {
-                RemoteControlButton(
+                RemoteHoldButton(
                     icon = Icons.Default.KeyboardArrowUp,
                     label = "Up",
-                    enabled = controlsEnabled,
-                    onClick = { onSendButton(FlipperRemoteButton.UP, false) }
+                    button = FlipperRemoteButton.UP,
+                    onKeyDown = onKeyDown,
+                    onKeyUp = onKeyUp
                 )
             }
             DPadRow {
-                RemoteControlButton(
+                RemoteHoldButton(
                     icon = Icons.Default.KeyboardArrowLeft,
                     label = "Left",
-                    enabled = controlsEnabled,
-                    onClick = { onSendButton(FlipperRemoteButton.LEFT, false) }
+                    button = FlipperRemoteButton.LEFT,
+                    onKeyDown = onKeyDown,
+                    onKeyUp = onKeyUp
                 )
                 Spacer(modifier = Modifier.width(10.dp))
-                RemoteControlButton(
+                RemoteHoldButton(
                     icon = Icons.Default.Check,
                     label = "OK",
-                    enabled = controlsEnabled,
-                    onClick = { onSendButton(FlipperRemoteButton.OK, false) }
+                    button = FlipperRemoteButton.OK,
+                    onKeyDown = onKeyDown,
+                    onKeyUp = onKeyUp
                 )
                 Spacer(modifier = Modifier.width(10.dp))
-                RemoteControlButton(
+                RemoteHoldButton(
                     icon = Icons.Default.KeyboardArrowRight,
                     label = "Right",
-                    enabled = controlsEnabled,
-                    onClick = { onSendButton(FlipperRemoteButton.RIGHT, false) }
+                    button = FlipperRemoteButton.RIGHT,
+                    onKeyDown = onKeyDown,
+                    onKeyUp = onKeyUp
                 )
             }
             DPadRow {
-                RemoteControlButton(
+                RemoteHoldButton(
                     icon = Icons.Default.KeyboardArrowDown,
                     label = "Down",
-                    enabled = controlsEnabled,
-                    onClick = { onSendButton(FlipperRemoteButton.DOWN, false) }
+                    button = FlipperRemoteButton.DOWN,
+                    onKeyDown = onKeyDown,
+                    onKeyUp = onKeyUp
                 )
             }
 
             DPadRow {
-                OutlinedButton(
-                    onClick = { onSendButton(FlipperRemoteButton.BACK, false) },
-                    enabled = controlsEnabled,
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = null)
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Back")
-                }
+                RemoteHoldButton(
+                    icon = Icons.Default.ArrowBack,
+                    label = "Back",
+                    button = FlipperRemoteButton.BACK,
+                    wide = true,
+                    onKeyDown = onKeyDown,
+                    onKeyUp = onKeyUp
+                )
             }
 
             if (isSendingRemoteInput) {
@@ -946,6 +1114,7 @@ private fun RemoteControlCard(
                 )
             }
         }
+        }
     }
 }
 
@@ -960,21 +1129,351 @@ private fun DPadRow(content: @Composable RowScope.() -> Unit) {
 }
 
 @Composable
-private fun RemoteControlButton(
+private fun RemoteHoldButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
-    enabled: Boolean,
-    onClick: () -> Unit
+    button: FlipperRemoteButton,
+    onKeyDown: (FlipperRemoteButton) -> Long?,
+    onKeyUp: (Long) -> Unit,
+    wide: Boolean = false
 ) {
-    FilledTonalButton(
-        onClick = onClick,
-        enabled = enabled,
+    var pressed by remember { mutableStateOf(false) }
+    Surface(
         shape = RoundedCornerShape(14.dp),
-        modifier = Modifier.widthIn(min = 86.dp)
+        color = if (pressed) VesperOrange else MaterialTheme.colorScheme.secondaryContainer,
+        modifier = Modifier
+            .widthIn(min = if (wide) 160.dp else 86.dp)
+            .semantics {
+                role = Role.Button
+                contentDescription = label
+            }
+            .heightIn(min = 48.dp)
+            .pointerInput(button) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(
+                        requireUnconsumed = false,
+                        pass = PointerEventPass.Initial
+                    )
+                    down.consume()
+                    pressed = true
+                    val gestureId = onKeyDown(button)
+                    try {
+                        waitForUpOrCancellation(pass = PointerEventPass.Initial)
+                    } finally {
+                        pressed = false
+                        if (gestureId != null) onKeyUp(gestureId)
+                    }
+                }
+            }
     ) {
-        Icon(icon, contentDescription = label)
-        Spacer(modifier = Modifier.width(4.dp))
-        Text(label)
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = if (pressed) Color(0xFF1A1B26) else MaterialTheme.colorScheme.onSecondaryContainer
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                label,
+                color = if (pressed) Color(0xFF1A1B26) else MaterialTheme.colorScheme.onSecondaryContainer
+            )
+        }
+    }
+}
+
+private data class KitTool(
+    val title: String,
+    val detail: String,
+    val icon: ImageVector,
+    val tint: Color,
+    val onClick: () -> Unit
+)
+
+@Composable
+private fun FlipperKit(
+    compact: Boolean,
+    scrollable: Boolean = true,
+    dense: Boolean = false,
+    onNavigateToFiles: () -> Unit,
+    onNavigateToOracle: () -> Unit,
+    onNavigateToArsenal: () -> Unit,
+    onNavigateToPayloadLab: () -> Unit,
+    onNavigateToStageRemote: () -> Unit,
+    onNavigateToOps: () -> Unit,
+    onNavigateToAudit: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val defend = listOf(
+        KitTool("Files", "What's stored on the Flipper", Icons.Default.Folder, RiskLow, onNavigateToFiles),
+        KitTool("Audit", "What this session already did", Icons.Default.History, RiskLow, onNavigateToAudit),
+        KitTool("Signals", "Radio the Flipper has saved", Icons.Default.Sensors, VesperCyan, onNavigateToArsenal),
+        KitTool("Oracle", "A closer look at one signal", Icons.Default.Visibility, VesperCyan, onNavigateToOracle)
+    )
+    val attack = listOf(
+        KitTool("Payloads", "Open the payload lab", Icons.Default.Code, VesperMagenta, onNavigateToPayloadLab),
+        KitTool("Stage", "Demo files ready to send", Icons.Default.SettingsRemote, VesperMagenta, onNavigateToStageRemote),
+        KitTool("Ops", "Link check and button macros", Icons.Default.BluetoothSearching, VesperAccent, onNavigateToOps)
+    )
+    if (compact) {
+        LazyRow(
+            modifier = modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(defend + attack, key = { it.title }) { tool ->
+                KitChip(tool)
+            }
+        }
+    } else {
+        Column(
+            modifier = modifier
+                .fillMaxWidth()
+                .then(if (scrollable) Modifier.verticalScroll(rememberScrollState()) else Modifier),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = "Kit",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold
+            )
+            if (!dense) {
+                Text(
+                    text = "Tokyo Night. The tools already in this app, split into defend and attack.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            KitSection("Defend", defend, dense)
+            if (dense) {
+                Text(
+                    text = "Attack",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = VesperMagenta
+                )
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(attack, key = { "attack-${it.title}" }) { tool ->
+                        KitChip(tool)
+                    }
+                }
+            } else {
+                KitSection("Attack", attack, dense)
+            }
+        }
+    }
+}
+
+@Composable
+private fun KitSection(title: String, tools: List<KitTool>, dense: Boolean = false) {
+    Column(verticalArrangement = Arrangement.spacedBy(if (dense) 6.dp else 8.dp)) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelLarge,
+            color = if (title == "Attack") VesperMagenta else RiskLow
+        )
+        tools.chunked(2).forEach { row ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                row.forEach { tool ->
+                    KitCard(tool, Modifier.weight(1f), dense)
+                }
+                if (row.size == 1) Spacer(modifier = Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun KitCard(tool: KitTool, modifier: Modifier = Modifier, dense: Boolean = false) {
+    Surface(
+        onClick = tool.onClick,
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surface,
+        modifier = modifier.heightIn(min = if (dense) 44.dp else 72.dp)
+    ) {
+        if (dense) {
+            Row(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(tool.icon, contentDescription = null, tint = tool.tint, modifier = Modifier.size(18.dp))
+                Text(tool.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            }
+        } else {
+            Column(
+                modifier = Modifier.padding(10.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Icon(tool.icon, contentDescription = null, tint = tool.tint)
+                Text(tool.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text(
+                    tool.detail,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun KitChip(tool: KitTool) {
+    Surface(
+        onClick = tool.onClick,
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surface
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(tool.icon, contentDescription = null, tint = tool.tint, modifier = Modifier.size(16.dp))
+            Text(tool.title, style = MaterialTheme.typography.labelLarge)
+        }
+    }
+}
+
+@Composable
+private fun FlipperScreenMirror(
+    frame: FlipperScreenImage?,
+    status: String?,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val bitmap = remember(frame?.id) { frame?.toLcdBitmap() }
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color(0xFF0C1210))
+                .padding(8.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            if (bitmap != null) {
+                Image(
+                    bitmap = bitmap,
+                    contentDescription = "Flipper screen",
+                    contentScale = ContentScale.Fit,
+                    filterQuality = FilterQuality.None,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(4.dp))
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(Color(0xFFD5E0C8)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = status ?: "Waiting for the Flipper screen",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFF1C2418),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 12.dp)
+                    )
+                }
+            }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = when {
+                    bitmap != null -> "Live Flipper screen"
+                    status.isNullOrBlank() -> "Flipper screen"
+                    else -> status
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = if (bitmap != null || status == "Live") VesperAccent else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f)
+            )
+            if (bitmap == null && status?.startsWith("Screen mirror unavailable") == true) {
+                TextButton(onClick = onRetry) {
+                    Text("Retry")
+                }
+            }
+        }
+    }
+}
+
+private fun FlipperScreenImage.toLcdBitmap(): androidx.compose.ui.graphics.ImageBitmap {
+    val (destWidth, destHeight) = when (orientation) {
+        FlipperScreenOrientation.VERTICAL,
+        FlipperScreenOrientation.VERTICAL_FLIP -> height to width
+        else -> width to height
+    }
+    val argb = IntArray(destWidth * destHeight)
+    val on = 0xFF1C2418.toInt()
+    val off = 0xFFD5E0C8.toInt()
+    for (y in 0 until height) {
+        for (x in 0 until width) {
+            val color = if (pixels[y * width + x]) on else off
+            val (dx, dy) = when (orientation) {
+                FlipperScreenOrientation.HORIZONTAL -> x to y
+                FlipperScreenOrientation.HORIZONTAL_FLIP -> (width - 1 - x) to (height - 1 - y)
+                FlipperScreenOrientation.VERTICAL -> (height - 1 - y) to x
+                FlipperScreenOrientation.VERTICAL_FLIP -> y to (width - 1 - x)
+            }
+            argb[dy * destWidth + dx] = color
+        }
+    }
+    val bitmap = Bitmap.createBitmap(destWidth, destHeight, Bitmap.Config.ARGB_8888)
+    bitmap.setPixels(argb, 0, destWidth, 0, 0, destWidth, destHeight)
+    return bitmap.asImageBitmap()
+}
+
+@Composable
+private fun FiveGhostBriefCard() {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                "5Ghost board, on the way",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                "A dual-band 2.4 and 5 GHz Wi-Fi add-on (RTL8720DN) that docks on the Flipper’s GPIO header. The Flipper has no Wi-Fi radio until that board is seated. It ships with its own firmware already loaded.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            BriefLine("Dock it", "Power the Flipper off, tighten the antenna, seat the board straight on the top GPIO pins, then power on.")
+            BriefLine("What to show", "Most office networks are on 5 GHz. A 2.4-only add-on never sees them. WPA3 and protected management frames are what stop a forced disconnect.")
+            BriefLine("How to run the demo", "Only on a network your security team owns, with one of them in the room. Lead with detection and architecture, not a disconnect.")
+        }
+    }
+}
+
+@Composable
+private fun BriefLine(title: String, detail: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = VesperCyan)
+        Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -999,7 +1498,7 @@ private fun ScanSection(
             if (isScanning) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(20.dp),
-                    color = Color.White,
+                    color = Color(0xFF1A1B26),
                     strokeWidth = 2.dp
                 )
                 Spacer(modifier = Modifier.width(8.dp))

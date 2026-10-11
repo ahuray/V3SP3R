@@ -61,7 +61,7 @@ fun AlchemyLabScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(VesperBackdropBrush)
+            .background(vesperPageBrush())
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -75,7 +75,7 @@ fun AlchemyLabScreen(
                             "Alchemy Lab",
                             style = MaterialTheme.typography.headlineLarge,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = MaterialTheme.colorScheme.onBackground
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Surface(
@@ -199,9 +199,9 @@ fun AlchemyLabScreen(
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.CheckCircle, null, tint = Color.White)
+                    Icon(Icons.Default.CheckCircle, null, tint = Color(0xFF1A1B26))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(message ?: "", color = Color.White, fontWeight = FontWeight.Medium)
+                    Text(message ?: "", color = Color(0xFF1A1B26), fontWeight = FontWeight.Medium)
                 }
             }
         }
@@ -391,7 +391,7 @@ private fun BlueprintCard(
                     ) { Text(blueprint.payloadType.icon, style = MaterialTheme.typography.titleLarge) }
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
-                        Text(blueprint.title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = Color.White)
+                        Text(blueprint.title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Surface(color = Color(blueprint.rarity.glowColor), shape = RoundedCornerShape(4.dp)) {
                                 Text(blueprint.rarity.displayName, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), style = MaterialTheme.typography.labelSmall, color = rarityColor, fontWeight = FontWeight.Bold)
@@ -423,7 +423,7 @@ private fun BlueprintCard(
                     ) {
                         Text(section.label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(section.value, style = MaterialTheme.typography.bodyMedium, fontFamily = FontFamily.Monospace, color = Color.White, fontWeight = FontWeight.Medium)
+                            Text(section.value, style = MaterialTheme.typography.bodyMedium, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
                             if (section.editable) {
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Icon(Icons.Default.Edit, null, modifier = Modifier.size(14.dp), tint = VesperOrange.copy(alpha = 0.6f))
@@ -438,7 +438,7 @@ private fun BlueprintCard(
             Spacer(modifier = Modifier.height(12.dp))
             Card(
                 modifier = Modifier.fillMaxWidth().heightIn(max = 150.dp),
-                colors = CardDefaults.cardColors(containerColor = VesperSurface),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 shape = RoundedCornerShape(8.dp)
             ) {
                 Box(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(12.dp)) {
@@ -508,7 +508,7 @@ private fun VaultHeader(
                     selected = selectedFilter == null,
                     onClick = { onFilterChange(null) },
                     label = { Text("All") },
-                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = VesperOrange, selectedLabelColor = Color.White)
+                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = VesperOrange, selectedLabelColor = Color(0xFF1A1B26))
                 )
             }
             val types = listOf(PayloadType.SUB_GHZ, PayloadType.INFRARED, PayloadType.NFC, PayloadType.RFID, PayloadType.BAD_USB, PayloadType.IBUTTON)
@@ -517,7 +517,7 @@ private fun VaultHeader(
                     selected = selectedFilter == type,
                     onClick = { onFilterChange(type) },
                     label = { Text("${type.icon} ${type.displayName} (${stats[type] ?: 0})") },
-                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Color(type.color), selectedLabelColor = Color.White)
+                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Color(type.color), selectedLabelColor = Color(0xFF1A1B26))
                 )
             }
         }
@@ -557,7 +557,7 @@ private fun LootCardItem(
 
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(loot.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                    Text(loot.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                     Spacer(modifier = Modifier.width(8.dp))
                     Surface(color = Color(loot.rarity.glowColor), shape = RoundedCornerShape(4.dp)) {
                         Text(loot.rarity.displayName, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), style = MaterialTheme.typography.labelSmall, color = rarityColor, fontWeight = FontWeight.Bold, fontSize = 9.sp)

@@ -26,12 +26,23 @@ class LlmProviderTest {
         )
         assertEquals("https://api.openai.com/v1/chat/completions", LlmProvider.OPENAI.chatCompletionsUrl)
         assertEquals("https://api.x.ai/v1/chat/completions", LlmProvider.XAI.chatCompletionsUrl)
+        assertEquals(
+            "https://api.anthropic.com/v1/chat/completions",
+            LlmProvider.ANTHROPIC.chatCompletionsUrl
+        )
 
         assertEquals("openrouter_api_key", LlmProvider.OPENROUTER.apiKeyPreference)
         assertEquals("selected_model", LlmProvider.OPENROUTER.modelPreference)
         assertEquals("gemini_api_key", LlmProvider.GEMINI.apiKeyPreference)
         assertEquals("openai_api_key", LlmProvider.OPENAI.apiKeyPreference)
         assertEquals("xai_api_key", LlmProvider.XAI.apiKeyPreference)
+        assertEquals("anthropic_api_key", LlmProvider.ANTHROPIC.apiKeyPreference)
+        assertEquals("selected_model_anthropic", LlmProvider.ANTHROPIC.modelPreference)
+        assertEquals("claude-sonnet-5-5", LlmProvider.ANTHROPIC.defaultModel)
+        assertFalse(LlmProvider.ANTHROPIC.allowsSamplingTemperature)
+        assertFalse(LlmProvider.ANTHROPIC.sendsAttributionHeaders)
+        assertTrue(LlmProvider.ANTHROPIC.acceptsCatalogModel("claude-sonnet-5-5"))
+        assertFalse(LlmProvider.ANTHROPIC.acceptsCatalogModel("claude-3-haiku-tts"))
     }
 
     @Test

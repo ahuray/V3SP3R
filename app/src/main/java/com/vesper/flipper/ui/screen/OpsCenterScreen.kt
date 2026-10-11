@@ -61,7 +61,7 @@ import com.vesper.flipper.ble.ConnectionDiagnosticsReport
 import com.vesper.flipper.ble.ConnectionState
 import com.vesper.flipper.ble.FirmwareCompatibilityProfile
 import com.vesper.flipper.domain.model.FlipperRemoteButton
-import com.vesper.flipper.ui.theme.VesperBackdropBrush
+import com.vesper.flipper.ui.theme.vesperPageBrush
 import com.vesper.flipper.ui.viewmodel.DeviceViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -253,7 +253,7 @@ fun OpsCenterScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(VesperBackdropBrush)
+                .background(vesperPageBrush())
                 .padding(padding)
         ) {
             LazyColumn(

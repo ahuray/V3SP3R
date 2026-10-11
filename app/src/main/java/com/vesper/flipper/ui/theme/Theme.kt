@@ -14,39 +14,40 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 // ═══════════════════════════════════════════════════════════
-// VESPER BRAND — Terminal / Phosphor Hacker
+// VESPER BRAND — Omarchy Tokyo Night
 // ═══════════════════════════════════════════════════════════
-// Signature: phosphor-green glow on deep terminal black, CRT amber for
-// attention, muted cyan-steel panels. The historic Vesper* names are kept so
-// the whole app re-skins by repointing these values; comments note each role.
+// Colors follow the Omarchy Tokyo Night theme
+// (/usr/share/omarchy/themes/tokyo-night/colors.toml).
+// The historic Vesper* names are kept so the whole app re-skins by
+// repointing these values. Primary is the theme's blue accent. Text on
+// that fill is the night background, which stays readable on the blue.
 
-// Primary: Terminal Green — deep emerald fill, phosphor glow for accents.
-// Deep enough that white text/icons on it stay legible (~4.9:1), since the
-// accent is used as a fill behind white content across many screens.
-val VesperWine = Color(0xFF0E7D47)           // Deep emerald (primary fill)
-val VesperWineLight = Color(0xFF35E07A)      // Phosphor green for glow highlights
-val VesperWineDark = Color(0xFF084F2D)       // Darker green for pressed states
+// Primary: Tokyo Night blue. Dark text on this fill, not white.
+val VesperWine = Color(0xFF7AA2F7)           // Blue accent (primary fill)
+val VesperWineLight = Color(0xFF7DCFFF)      // Bright cyan for glow highlights
+val VesperWineDark = Color(0xFF3D59A1)       // Deeper blue for pressed states
 
 // Legacy alias — keeps existing references working
 val VesperOrange = VesperWine
 val VesperOrangeDark = VesperWineDark
 
-// Secondary: Cyan Steel — cold data accent
-val VesperSecondary = Color(0xFF24312B)      // Lifted panel, green-tinted
-val VesperGunmetal = Color(0xFF2E3D35)       // Lifted panel
-val VesperCyan = Color(0xFF34E7E4)           // Data cyan for secondary accents
+// Secondary: night panels and the theme cyan
+val VesperSecondary = Color(0xFF24283B)      // Lighter background
+val VesperGunmetal = Color(0xFF292E42)       // Selection
+val VesperCyan = Color(0xFF7DCFFF)           // Bright cyan
 
-// Accent: CRT Amber — attention / warning glow
-val VesperAccent = Color(0xFFF4B740)         // CRT amber
-val VesperGold = Color(0xFFF4B740)
-val VesperGoldMuted = Color(0xFFB7891F)      // Muted amber for secondary accents
+// Accent: Tokyo Night yellow for attention, magenta for the attack kit
+val VesperAccent = Color(0xFFE0AF68)         // Yellow
+val VesperGold = Color(0xFFE0AF68)
+val VesperGoldMuted = Color(0xFF9A7340)
+val VesperMagenta = Color(0xFFBB9AF7)
 
-// Surface Colors — lifted terminal charcoal so body text stays readable on a phone.
-val VesperSurface = Color(0xFF24312B)
-val VesperSurfaceVariant = Color(0xFF2E3D35)
-val VesperBackground = Color(0xFF1A2621)
-val VesperBackgroundDeep = Color(0xFF14201C)
-val VesperBackgroundGlow = Color(0xFF1E3329)
+// Surface Colors — Tokyo Night backgrounds.
+val VesperSurface = Color(0xFF24283B)
+val VesperSurfaceVariant = Color(0xFF292E42)
+val VesperBackground = Color(0xFF1A1B26)
+val VesperBackgroundDeep = Color(0xFF13141C)
+val VesperBackgroundGlow = Color(0xFF24283B)
 
 val VesperBackdropBrush = Brush.verticalGradient(
     colors = listOf(
@@ -57,44 +58,53 @@ val VesperBackdropBrush = Brush.verticalGradient(
     )
 )
 
-// Risk Colors — terminal-coded
-val RiskLow = Color(0xFF2DE37E)      // Phosphor green — clear
-val RiskMedium = Color(0xFFF4B740)   // Amber — caution
-val RiskHigh = Color(0xFFFF5C66)     // Alert red
-val RiskBlocked = Color(0xFF5E6E66)  // Muted green-gray
+/** Page wash that follows the active scheme, so light and dark tabs share one canvas. */
+@Composable
+fun vesperPageBrush(): Brush {
+    val scheme = MaterialTheme.colorScheme
+    return Brush.verticalGradient(
+        colors = listOf(scheme.background, scheme.surface, scheme.background)
+    )
+}
+
+// Risk Colors — Tokyo Night
+val RiskLow = Color(0xFF9ECE6A)      // Green — clear
+val RiskMedium = Color(0xFFE0AF68)   // Yellow — caution
+val RiskHigh = Color(0xFFF7768E)     // Red
+val RiskBlocked = Color(0xFF565F89)  // Dark foreground
 
 // Diff Colors
-val DiffAdded = Color(0xFF2DE37E)
-val DiffRemoved = Color(0xFFFF5C66)
-val DiffChanged = Color(0xFFF4B740)
-val DiffAddedBackground = Color(0x332DE37E)
-val DiffRemovedBackground = Color(0x33FF5C66)
+val DiffAdded = Color(0xFF9ECE6A)
+val DiffRemoved = Color(0xFFF7768E)
+val DiffChanged = Color(0xFFE0AF68)
+val DiffAddedBackground = Color(0x339ECE6A)
+val DiffRemovedBackground = Color(0x33F7768E)
 
-// Chat Colors — distinct from system
-val ChatAssistant = Color(0xFF2E3D35)       // Panel bubble
-val ChatUser = VesperWineDark                // Deep-green bubble for user
-val ChatTool = Color(0xFF24312B)             // Tool results
-val ChatToolAccent = VesperGold              // Amber for tool highlights
+// Chat Colors — night panels
+val ChatAssistant = Color(0xFF292E42)
+val ChatUser = VesperWineDark
+val ChatTool = Color(0xFF24283B)
+val ChatToolAccent = VesperGold
 
 private val DarkColorScheme = darkColorScheme(
     primary = VesperWine,
-    onPrimary = Color(0xFFEAF6EF),
+    onPrimary = Color(0xFF1A1B26),
     primaryContainer = VesperWineDark,
-    onPrimaryContainer = Color(0xFFBFF4D7),
+    onPrimaryContainer = Color(0xFFC0CAF5),
     secondary = VesperCyan,
-    onSecondary = Color(0xFF04140B),
+    onSecondary = Color(0xFF1A1B26),
     secondaryContainer = VesperSurfaceVariant,
-    onSecondaryContainer = Color(0xFFCDE9E6),
+    onSecondaryContainer = Color(0xFFC0CAF5),
     tertiary = VesperGold,
-    onTertiary = Color(0xFF1A1300),
+    onTertiary = Color(0xFF1A1B26),
     background = VesperBackground,
-    onBackground = Color(0xFFF4FBF7),
+    onBackground = Color(0xFFC0CAF5),
     surface = VesperSurface,
-    onSurface = Color(0xFFF4FBF7),
+    onSurface = Color(0xFFC0CAF5),
     surfaceVariant = VesperSurfaceVariant,
-    onSurfaceVariant = Color(0xFFD5E6DC),
-    outline = Color(0xFF7FA08F),
-    outlineVariant = Color(0xFF4E675C),
+    onSurfaceVariant = Color(0xFFA9B1D6),
+    outline = Color(0xFF565F89),
+    outlineVariant = Color(0xFF414868),
     error = RiskHigh,
     onError = Color(0xFF200909)
 )
@@ -102,22 +112,24 @@ private val DarkColorScheme = darkColorScheme(
 private val LightColorScheme = lightColorScheme(
     primary = VesperWineDark,
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFC6F3DB),
-    onPrimaryContainer = Color(0xFF04341F),
-    secondary = Color(0xFF0E7F7C),
+    primaryContainer = Color(0xFFD5DEF8),
+    onPrimaryContainer = Color(0xFF1A1B26),
+    secondary = Color(0xFF3D5A80),
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFC7EEEC),
-    onSecondaryContainer = Color(0xFF04312F),
+    secondaryContainer = Color(0xFFD7E2F2),
+    onSecondaryContainer = Color(0xFF1A1B26),
     tertiary = VesperGoldMuted,
     onTertiary = Color.White,
-    background = Color(0xFFF1F5F2),
-    onBackground = Color(0xFF101713),
-    surface = Color.White,
-    onSurface = Color(0xFF101713),
-    surfaceVariant = Color(0xFFE2EBE5),
-    onSurfaceVariant = Color(0xFF46524B),
-    outline = Color(0xFF6C786F),
-    outlineVariant = Color(0xFFBECABB),
+    tertiaryContainer = Color(0xFFF3E4C8),
+    onTertiaryContainer = Color(0xFF1A1B26),
+    background = Color(0xFFE6E9F5),
+    onBackground = Color(0xFF1A1B26),
+    surface = Color(0xFFF4F6FC),
+    onSurface = Color(0xFF1A1B26),
+    surfaceVariant = Color(0xFFD9DEEF),
+    onSurfaceVariant = Color(0xFF414868),
+    outline = Color(0xFF7A82A0),
+    outlineVariant = Color(0xFFC5CAE0),
     error = RiskHigh,
     onError = Color.White
 )

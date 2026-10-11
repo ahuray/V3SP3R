@@ -62,7 +62,7 @@ fun FapHubScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(VesperBackground, VesperSurfaceVariant, VesperBackground)))
+            .background(vesperPageBrush())
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             // Header
@@ -73,7 +73,7 @@ fun FapHubScreen(
             ) {
                 Column {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("FapHub", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text("FapHub", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
                         Spacer(modifier = Modifier.width(8.dp))
                         Surface(color = VesperOrange.copy(alpha = 0.2f), shape = RoundedCornerShape(6.dp)) {
                             Text("ARSENAL", modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp), style = MaterialTheme.typography.labelSmall, color = VesperOrange, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
@@ -90,7 +90,7 @@ fun FapHubScreen(
             TabRow(
                 selectedTabIndex = if (activeTab == HubTab.APPS) 0 else 1,
                 containerColor = Color.Transparent,
-                contentColor = Color.White,
+                contentColor = MaterialTheme.colorScheme.onSurface,
                 indicator = { tabPositions ->
                     TabRowDefaults.Indicator(
                         modifier = Modifier.tabIndicatorOffset(tabPositions[if (activeTab == HubTab.APPS) 0 else 1]),
@@ -211,7 +211,7 @@ private fun AppsTabContent(
                     selected = selectedPack == null,
                     onClick = { onPackSelect(null) },
                     label = { Text("All bare") },
-                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = VesperOrange, selectedLabelColor = Color.White)
+                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = VesperOrange, selectedLabelColor = Color(0xFF1A1B26))
                 )
             }
             items(FapPack.entries) { pack ->
@@ -219,7 +219,7 @@ private fun AppsTabContent(
                     selected = selectedPack == pack,
                     onClick = { onPackSelect(if (selectedPack == pack) null else pack) },
                     label = { Text("${pack.displayName} (${FapHubCatalog.appsInPack(pack).size})") },
-                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = VesperOrange, selectedLabelColor = Color.White)
+                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = VesperOrange, selectedLabelColor = Color(0xFF1A1B26))
                 )
             }
         }
@@ -246,12 +246,12 @@ private fun AppsTabContent(
             item {
                 FilterChip(selected = selectedCategory == null, onClick = { onCategorySelect(null) }, label = { Text("All") },
                     leadingIcon = if (selectedCategory == null) {{ Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp)) }} else null,
-                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = VesperOrange, selectedLabelColor = Color.White))
+                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = VesperOrange, selectedLabelColor = Color(0xFF1A1B26)))
             }
             items(FapCategory.entries) { cat ->
                 FilterChip(selected = selectedCategory == cat, onClick = { onCategorySelect(cat) },
                     label = { Text("${cat.icon} ${cat.displayName} (${categoryCounts[cat] ?: 0})") },
-                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = VesperOrange, selectedLabelColor = Color.White))
+                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = VesperOrange, selectedLabelColor = Color(0xFF1A1B26)))
             }
         }
 
@@ -311,13 +311,13 @@ private fun ResourcesTabContent(
         LazyRow(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(horizontal = 16.dp)) {
             item {
                 FilterChip(selected = selectedType == null, onClick = { onTypeSelect(null) }, label = { Text("All") },
-                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = VesperOrange, selectedLabelColor = Color.White))
+                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = VesperOrange, selectedLabelColor = Color(0xFF1A1B26)))
             }
             items(FlipperResourceType.entries) { type ->
                 FilterChip(
                     selected = selectedType == type, onClick = { onTypeSelect(type) },
                     label = { Text("${type.icon} ${type.displayName}") },
-                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Color(type.color), selectedLabelColor = Color.White)
+                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Color(type.color), selectedLabelColor = Color(0xFF1A1B26))
                 )
             }
         }
@@ -339,7 +339,7 @@ private fun ResourceRepoCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = VesperSurfaceVariant),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
@@ -355,7 +355,7 @@ private fun ResourceRepoCard(
                 Spacer(modifier = Modifier.width(12.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(repo.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(repo.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("by ${repo.author}", style = MaterialTheme.typography.labelSmall, color = VesperOrange)
                         Surface(color = Color(repo.resourceType.color).copy(alpha = 0.2f), shape = RoundedCornerShape(4.dp)) {
@@ -414,7 +414,7 @@ private fun RepoDetailSheet(
     onDismiss: () -> Unit
 ) {
     val uriHandler = LocalUriHandler.current
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = VesperSurfaceVariant) {
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.surfaceVariant) {
         Column(modifier = Modifier.fillMaxWidth().padding(24.dp)) {
             Row(verticalAlignment = Alignment.Top) {
                 Box(
@@ -427,7 +427,7 @@ private fun RepoDetailSheet(
                 Spacer(modifier = Modifier.width(16.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(repo.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text(repo.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                     Text("by ${repo.author}", style = MaterialTheme.typography.bodyMedium, color = VesperOrange)
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(top = 8.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -445,7 +445,7 @@ private fun RepoDetailSheet(
             }
 
             Spacer(modifier = Modifier.height(24.dp))
-            Text("About", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
+            Text("About", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             Spacer(modifier = Modifier.height(8.dp))
             Text(repo.description, style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
 
@@ -453,7 +453,7 @@ private fun RepoDetailSheet(
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Column {
                     Text("Type", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
-                    Text("${repo.resourceType.icon} ${repo.resourceType.displayName}", style = MaterialTheme.typography.bodyMedium, color = Color.White)
+                    Text("${repo.resourceType.icon} ${repo.resourceType.displayName}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text("Flipper Path", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
@@ -468,7 +468,7 @@ private fun RepoDetailSheet(
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(repo.tags) { tag ->
                         Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(6.dp)) {
-                            Text(tag, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), style = MaterialTheme.typography.labelSmall, color = Color.White)
+                            Text(tag, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
                         }
                     }
                 }
@@ -499,7 +499,7 @@ private fun RepoDetailSheet(
 
 @Composable
 private fun FapAppCard(app: FapApp, installStatus: InstallStatus?, onInstall: () -> Unit, onUninstall: () -> Unit, onClick: () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick), colors = CardDefaults.cardColors(containerColor = VesperSurfaceVariant), shape = RoundedCornerShape(16.dp)) {
+    Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), shape = RoundedCornerShape(16.dp)) {
         Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(modifier = Modifier.size(56.dp).clip(RoundedCornerShape(12.dp)).background(Brush.linearGradient(listOf(getCategoryColor(app.category), getCategoryColor(app.category).copy(alpha = 0.6f)))), contentAlignment = Alignment.Center) {
                 Text(app.category.icon, style = MaterialTheme.typography.headlineSmall)
@@ -507,8 +507,8 @@ private fun FapAppCard(app: FapApp, installStatus: InstallStatus?, onInstall: ()
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(app.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-                    if (app.isInstalled) { Spacer(modifier = Modifier.width(8.dp)); Box(modifier = Modifier.background(RiskLow, RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 2.dp)) { Text("Installed", style = MaterialTheme.typography.labelSmall, color = Color.White) } }
+                    Text(app.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                    if (app.isInstalled) { Spacer(modifier = Modifier.width(8.dp)); Box(modifier = Modifier.background(RiskLow, RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 2.dp)) { Text("Installed", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface) } }
                 }
                 Text(app.description, style = MaterialTheme.typography.bodySmall, color = Color.Gray, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Spacer(modifier = Modifier.height(4.dp))
@@ -527,7 +527,7 @@ private fun FapAppCard(app: FapApp, installStatus: InstallStatus?, onInstall: ()
 @Composable
 private fun InstallButton(isInstalled: Boolean, status: InstallStatus?, onInstall: () -> Unit, onUninstall: () -> Unit) {
     when (status) {
-        is InstallStatus.Downloading -> Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(progress = status.progress, modifier = Modifier.size(40.dp), color = VesperOrange, strokeWidth = 3.dp); Text("${(status.progress * 100).toInt()}%", style = MaterialTheme.typography.labelSmall, color = Color.White) }
+        is InstallStatus.Downloading -> Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(progress = status.progress, modifier = Modifier.size(40.dp), color = VesperOrange, strokeWidth = 3.dp); Text("${(status.progress * 100).toInt()}%", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface) }
         is InstallStatus.Installing -> Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(modifier = Modifier.size(40.dp), color = VesperOrange, strokeWidth = 3.dp) }
         is InstallStatus.Success -> Icon(Icons.Default.CheckCircle, "Installed", tint = RiskLow, modifier = Modifier.size(40.dp))
         is InstallStatus.Error -> Icon(Icons.Default.Error, "Error", tint = RiskHigh, modifier = Modifier.size(40.dp))
@@ -540,13 +540,13 @@ private fun InstallButton(isInstalled: Boolean, status: InstallStatus?, onInstal
 
 @Composable
 private fun AppDetailSheet(app: FapApp, installStatus: InstallStatus?, onInstall: () -> Unit, onUninstall: () -> Unit, onDismiss: () -> Unit) {
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = VesperSurfaceVariant) {
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.surfaceVariant) {
         Column(modifier = Modifier.fillMaxWidth().padding(24.dp)) {
             Row(verticalAlignment = Alignment.Top) {
                 Box(modifier = Modifier.size(72.dp).clip(RoundedCornerShape(16.dp)).background(Brush.linearGradient(listOf(getCategoryColor(app.category), getCategoryColor(app.category).copy(alpha = 0.6f)))), contentAlignment = Alignment.Center) { Text(app.category.icon, style = MaterialTheme.typography.headlineLarge) }
                 Spacer(modifier = Modifier.width(16.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(app.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text(app.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                     Text("by ${app.author}", style = MaterialTheme.typography.bodyMedium, color = VesperOrange)
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(top = 8.dp)) {
                         Text(app.pack.displayName, style = MaterialTheme.typography.bodySmall, color = VesperOrange)
@@ -556,21 +556,21 @@ private fun AppDetailSheet(app: FapApp, installStatus: InstallStatus?, onInstall
                 }
             }
             Spacer(modifier = Modifier.height(24.dp))
-            Text("About", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
+            Text("About", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             Spacer(modifier = Modifier.height(8.dp))
             Text(app.description, style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
             Spacer(modifier = Modifier.height(8.dp))
             Text(FapHubCatalog.installPath(app), style = MaterialTheme.typography.bodySmall, color = Color.Gray)
             Spacer(modifier = Modifier.height(24.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Column { Text("Category", style = MaterialTheme.typography.labelMedium, color = Color.Gray); Text("${app.category.icon} ${app.category.displayName}", style = MaterialTheme.typography.bodyMedium, color = Color.White) }
-                Column(horizontalAlignment = Alignment.End) { Text("Target Firmware", style = MaterialTheme.typography.labelMedium, color = Color.Gray); Text(app.targetFirmware, style = MaterialTheme.typography.bodyMedium, color = Color.White) }
+                Column { Text("Category", style = MaterialTheme.typography.labelMedium, color = Color.Gray); Text("${app.category.icon} ${app.category.displayName}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface) }
+                Column(horizontalAlignment = Alignment.End) { Text("Target Firmware", style = MaterialTheme.typography.labelMedium, color = Color.Gray); Text(app.targetFirmware, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface) }
             }
             Spacer(modifier = Modifier.height(32.dp))
             Button(onClick = if (app.isInstalled) onUninstall else onInstall, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = if (app.isInstalled) RiskHigh else VesperOrange), contentPadding = PaddingValues(vertical = 16.dp), enabled = installStatus == null || installStatus is InstallStatus.Error) {
                 when (installStatus) {
-                    is InstallStatus.Downloading -> { CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp); Spacer(modifier = Modifier.width(8.dp)); Text("Downloading ${(installStatus.progress * 100).toInt()}%") }
-                    is InstallStatus.Installing -> { CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp); Spacer(modifier = Modifier.width(8.dp)); Text("Installing...") }
+                    is InstallStatus.Downloading -> { CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.onSurface, strokeWidth = 2.dp); Spacer(modifier = Modifier.width(8.dp)); Text("Downloading ${(installStatus.progress * 100).toInt()}%") }
+                    is InstallStatus.Installing -> { CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.onSurface, strokeWidth = 2.dp); Spacer(modifier = Modifier.width(8.dp)); Text("Installing...") }
                     is InstallStatus.Success -> { Icon(Icons.Default.CheckCircle, null); Spacer(modifier = Modifier.width(8.dp)); Text("Installed!") }
                     else -> { Icon(if (app.isInstalled) Icons.Default.Delete else Icons.Default.Download, null); Spacer(modifier = Modifier.width(8.dp)); Text(if (app.isInstalled) "Uninstall" else "Install") }
                 }
