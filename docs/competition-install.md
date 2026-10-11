@@ -223,3 +223,19 @@ The script ships in `competition-pack/` on this branch and prints `PACK OK` on a
 - TODO(verify) Android Settings path for unknown-tracker scan on this phone.
 - TODO(verify) UART pinout, voltage, and baud for the bench board.
 - TODO(verify) on-screen run controls inside stock BadUSB, stock Sub-GHz, T5577 Raw Writer, and FindMy Flipper on this Unleashed build. File paths in this guide are the part the app guarantees.
+
+## 9. Live content (unsafe branch only)
+
+The `unsafe` branch adds `competition-pack-live/` for demo day. The safe pack (`competition-pack/`) and `validate_pack.py` are unchanged. `docs/competition-live-runbook.md` is required reading before any live station. Copy from a checkout of `unsafe`. `competition-pack-live/` is not on `safe-test`.
+
+Use the SD-card reader or qFlipper method from section 5. Copy `competition-pack-live/payloads/live_*.txt` into `/ext/badusb/`. Copy `competition-pack-live/evilportal/index.html` to `/ext/apps_data/evil_portal/index.html`, the conventional Marauder evil-portal path. TODO(verify) that directory for the flashed Marauder build; record it in `competition-pack-live/evilportal/README.md`, which stays on the computer.
+
+Edit `LAB_SSID_HERE` in `live_wifi_key_reveal_windows.txt` to the lab SSID before the demo.
+
+From inside `competition-pack-live/`:
+
+```bash
+python3 validate_live_pack.py
+```
+
+A clean run prints `PACK LIVE OK`. Any other result is a failed check.
