@@ -220,7 +220,13 @@ data class DeviceInfo(
     @SerialName("battery_level")
     val batteryLevel: Int,
     @SerialName("is_charging")
-    val isCharging: Boolean
+    val isCharging: Boolean,
+    // Firmware SDK API version (e.g. "88.2") as reported by the device, when
+    // available. Used to pick the matching FAP build from the catalog so that
+    // custom firmware (Unleashed/RogueMaster/Momentum) gets a compatible build
+    // instead of a guess derived from the firmware name.
+    @SerialName("api_version")
+    val apiVersion: String? = null
 )
 
 @Serializable

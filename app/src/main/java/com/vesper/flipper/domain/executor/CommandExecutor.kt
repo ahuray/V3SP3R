@@ -715,12 +715,16 @@ class CommandExecutor @Inject constructor(
         val installFolder = app?.installFolder?.takeIf { it.isNotBlank() } ?: (app?.category ?: FapCategory.MISC).name.lowercase()
 
         if (directDownloadUrl.isNullOrBlank() && catalogAlias != null) {
-            val firmware = try {
-                fileSystem.getDeviceInfo().getOrNull()?.firmwareVersion
+            val deviceInfo = try {
+                fileSystem.getDeviceInfo().getOrNull()
             } catch (_: Exception) {
                 null
             }
-            val downloaded = catalogClient.downloadFap(catalogAlias, firmware)
+            val downloaded = catalogClient.downloadFap(
+                catalogAlias,
+                deviceInfo?.firmwareVersion,
+                deviceInfo?.apiVersion,
+            )
             if (downloaded.bytes.size > MAX_FAP_BYTES) {
                 throw IOException("Downloaded file too large (${downloaded.bytes.size} bytes)")
             }

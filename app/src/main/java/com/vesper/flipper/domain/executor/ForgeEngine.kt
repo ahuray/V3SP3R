@@ -134,7 +134,7 @@ TE: 400
 ```
 
 ### Key constraints:
-- Frequency range: 300000000–928000000 Hz (common: 300/315/390/433920000/868350000)
+- Frequency range: 280000000–930000000 Hz (common: 300/315/390/433920000/868350000; custom firmware such as Unleashed also uses the wider in-band ranges)
 - Valid presets: FuriHalSubGhzPresetOok270Async, FuriHalSubGhzPresetOok650Async, FuriHalSubGhzPreset2FSKDev238Async, FuriHalSubGhzPreset2FSKDev476Async
 - RAW_Data: positive = signal high (microseconds), negative = signal low. Must alternate.
 - For RAW: generate at least 20-50 realistic timing values per RAW_Data line

@@ -209,12 +209,16 @@ class FapHubViewModel @Inject constructor(
     private suspend fun installAppNow(app: FapApp) {
         _installStatus.value = _installStatus.value + (app.id to InstallStatus.Downloading(0.2f))
         val alias = app.catalogAlias.ifBlank { app.id }
-        val firmware = try {
-            flipperFileSystem.getDeviceInfo().getOrNull()?.firmwareVersion
+        val deviceInfo = try {
+            flipperFileSystem.getDeviceInfo().getOrNull()
         } catch (_: Exception) {
             null
         }
-        val downloaded = catalogClient.downloadFap(alias, firmware)
+        val downloaded = catalogClient.downloadFap(
+            alias,
+            deviceInfo?.firmwareVersion,
+            deviceInfo?.apiVersion,
+        )
         if (!FlipperCatalogJson.isFapElf(downloaded.bytes)) {
             throw java.io.IOException("Catalog did not return a FAP for ${app.name}")
         }

@@ -939,6 +939,21 @@ class FlipperProtocol @Inject constructor() {
             "target"
         ) ?: "unknown"
 
+        // Firmware SDK API version (major.minor, e.g. "88.2"). The device reports
+        // this directly, so it is correct for any firmware fork; the catalog uses
+        // the same major.minor to select a compatible FAP build.
+        val apiMajor = firstNonBlank(
+            deviceInfoPairs,
+            "firmware_api.major",
+            "firmware_api_major"
+        )
+        val apiMinor = firstNonBlank(
+            deviceInfoPairs,
+            "firmware_api.minor",
+            "firmware_api_minor"
+        )
+        val apiVersion = if (apiMajor != null && apiMinor != null) "$apiMajor.$apiMinor" else null
+
         val batteryLevel = parsePercent(
             powerInfoPairs,
             "charge_percent",
@@ -982,7 +997,8 @@ class FlipperProtocol @Inject constructor() {
                 firmwareVersion = firmwareVersion,
                 hardwareVersion = hardwareVersion,
                 batteryLevel = batteryLevel.coerceIn(0, 100),
-                isCharging = isCharging
+                isCharging = isCharging,
+                apiVersion = apiVersion
             ),
             storageInfo = storageInfo
         )

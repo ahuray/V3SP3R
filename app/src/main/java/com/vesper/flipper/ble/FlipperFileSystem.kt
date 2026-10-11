@@ -825,12 +825,20 @@ class FlipperFileSystem @Inject constructor(
         val isCharging = Regex(
             "(?i)\\b(charging|charger_connected\\s*[:=]\\s*(?:1|true|yes)|charge_state\\s*[:=]\\s*charging)\\b"
         ).containsMatchIn(content)
+        // SDK API version from `device_info` output (e.g. firmware_api.major: 88 /
+        // firmware_api.minor: 2 → "88.2"), used to pin a compatible FAP build.
+        val apiMajor = Regex("(?im)^firmware_api[._]major\\s*[:=]\\s*(\\d+)\\s*$")
+            .find(content)?.groupValues?.getOrNull(1)
+        val apiMinor = Regex("(?im)^firmware_api[._]minor\\s*[:=]\\s*(\\d+)\\s*$")
+            .find(content)?.groupValues?.getOrNull(1)
+        val apiVersion = if (apiMajor != null && apiMinor != null) "$apiMajor.$apiMinor" else null
         return DeviceInfo(
             name = "Flipper Zero",
             firmwareVersion = firmware,
             hardwareVersion = "unknown",
             batteryLevel = batteryLevel.coerceIn(0, 100),
-            isCharging = isCharging
+            isCharging = isCharging,
+            apiVersion = apiVersion
         )
     }
 

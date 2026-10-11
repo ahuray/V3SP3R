@@ -73,6 +73,16 @@ object FlipperCatalogJson {
         }
     }
 
+    /**
+     * Accept a device-reported SDK API string ("major.minor", e.g. "88.2") and
+     * return it only when well-formed. This is the most accurate source because
+     * the device states its own API regardless of firmware fork.
+     */
+    fun normalizeApi(api: String?): String? {
+        val trimmed = api?.trim() ?: return null
+        return if (trimmed.matches(Regex("""\d+\.\d+"""))) trimmed else null
+    }
+
     fun candidateApis(firmware: String?, latestReleaseApi: String?, currentApi: String?): List<String> {
         return listOfNotNull(
             sdkApiForFirmware(firmware),
@@ -117,17 +127,24 @@ class FlipperCatalogClient(
     @Volatile private var applications: List<CatalogApplication>? = null
     @Volatile private var latestReleaseApi: String? = null
 
-    suspend fun downloadFap(alias: String, firmwareVersion: String?): DownloadedFap = withContext(Dispatchers.IO) {
+    suspend fun downloadFap(
+        alias: String,
+        firmwareVersion: String?,
+        deviceApi: String? = null,
+    ): DownloadedFap = withContext(Dispatchers.IO) {
         val needle = alias.trim()
         if (needle.isEmpty()) throw IllegalArgumentException("Catalog alias is blank")
 
         val app = loadApplications().firstOrNull { it.alias.equals(needle, ignoreCase = true) }
             ?: throw IOException("Flipper catalog has no app named \"$needle\"")
 
-        // When the connected firmware maps to a known SDK API, pin to exactly
-        // that build. Falling back to the latest/other APIs would install an ELF
-        // compiled for a different SDK, which can crash on the device.
-        val knownApi = FlipperCatalogJson.sdkApiForFirmware(firmwareVersion)
+        // Prefer the SDK API the device reports directly — it is correct for any
+        // firmware fork (Unleashed/RogueMaster/Momentum). Otherwise map from the
+        // firmware name. When either resolves, pin to exactly that build, since
+        // falling back to another API installs an ELF compiled for a different
+        // SDK, which can crash on the device.
+        val knownApi = FlipperCatalogJson.normalizeApi(deviceApi)
+            ?: FlipperCatalogJson.sdkApiForFirmware(firmwareVersion)
         val apis = if (knownApi != null) {
             listOf(knownApi)
         } else {
