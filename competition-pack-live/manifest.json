@@ -1,0 +1,69 @@
+{
+  "id": "vesper-security-competition-live",
+  "name": "V3SP3R Security Competition Pack - LIVE",
+  "version": "1.0.0",
+  "generated": "2026-10-11",
+  "firmware": {
+    "fork": "unleashed",
+    "sdkApiMajor": 88,
+    "note": "Apps resolve from catalog.flipperzero.one pinned to the device-reported SDK API; Unleashed accepts same-major builds (loader compares API major only)."
+  },
+  "authorization": "Run only on lab-owned devices after the signed authorization gate in docs/competition-live-runbook.md is complete. This pack contains live-fire demo material; the full-dummy version lives in competition-pack/ (branch safe-test).",
+  "categories": [
+    {
+      "id": "red-badusb-live",
+      "title": "BadUSB live payloads (sacrificial laptop)",
+      "entries": [
+        {
+          "type": "file",
+          "path": "payloads/live_wifi_key_reveal_windows.txt",
+          "target": "/ext/badusb/live_wifi_key_reveal_windows.txt",
+          "role": "Reveal the saved lab WiFi password on the sacrificial laptop screen. Edit LAB_SSID_HERE to the lab SSID first; output never leaves the machine."
+        },
+        {
+          "type": "file",
+          "path": "payloads/live_credential_prompt_windows.txt",
+          "target": "/ext/badusb/live_credential_prompt_windows.txt",
+          "role": "Pop a LabGuest sign-in prompt on the sacrificial laptop, then show only the typed username on screen. The password is discarded by construction."
+        },
+        {
+          "type": "file",
+          "path": "payloads/live_hackertyper_windows.txt",
+          "target": "/ext/badusb/live_hackertyper_windows.txt",
+          "role": "Comic beat: open hackertyper.net fullscreen on the sacrificial laptop."
+        }
+      ]
+    },
+    {
+      "id": "red-wifi-live",
+      "title": "Wi-Fi live fire (ESP32-S2 devboard + Marauder)",
+      "entries": [
+        {
+          "type": "catalog-app",
+          "alias": "esp32_wifi_marauder",
+          "name": "WiFi Marauder",
+          "pack": "red",
+          "needsModule": true,
+          "role": "Run the live Wi-Fi beats (scan, 30 s deauth of the lab AP, beacon spam with lab names, evil portal) on the isolated lab network. Requires the ESP32-S2 Wi-Fi devboard.",
+          "source": "https://catalog.flipperzero.one"
+        },
+        {
+          "type": "file",
+          "path": "evilportal/index.html",
+          "target": "/ext/apps_data/evil_portal/index.html",
+          "role": "Captive-portal phish demo page for the lab AP. Audience signs in with organizer-issued test credentials; captured entries land on the lab Flipper SD card and are deleted on stage."
+        },
+        {
+          "type": "builtin",
+          "name": "Marauder deauth attack (firmware feature)",
+          "role": "Deauthenticate lab AP clients for at most 30 seconds on the isolated lab network. Stop condition and restore steps are in docs/competition-live-runbook.md."
+        },
+        {
+          "type": "builtin",
+          "name": "Marauder beacon spam (firmware feature)",
+          "role": "Broadcast joke/lab SSIDs on the isolated lab network for the audience-visible beacon flood."
+        }
+      ]
+    }
+  ]
+}
