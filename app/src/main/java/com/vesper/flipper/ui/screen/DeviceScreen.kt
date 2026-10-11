@@ -47,7 +47,8 @@ fun DeviceScreen(
     onNavigateToFiles: () -> Unit = {},
     onNavigateToOracle: () -> Unit = {},
     onNavigateToArsenal: () -> Unit = {},
-    onNavigateToPayloadLab: () -> Unit = {}
+    onNavigateToPayloadLab: () -> Unit = {},
+    onNavigateToStageRemote: () -> Unit = {}
 ) {
     val connectionState by viewModel.connectionState.collectAsState()
     val discoveredDevices by viewModel.discoveredDevices.collectAsState()
@@ -89,6 +90,12 @@ fun DeviceScreen(
                         Icon(
                             Icons.Default.Code,
                             contentDescription = "Payload Lab"
+                        )
+                    }
+                    IconButton(onClick = onNavigateToStageRemote) {
+                        Icon(
+                            Icons.Default.SettingsRemote,
+                            contentDescription = "Stage Remote"
                         )
                     }
                     if (connectionState is ConnectionState.Connected) {

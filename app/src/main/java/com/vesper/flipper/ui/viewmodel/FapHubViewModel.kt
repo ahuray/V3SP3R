@@ -183,9 +183,13 @@ class FapHubViewModel @Inject constructor(
     }
 
     fun installPack(pack: FapPack?) {
-        if (_packProgress.value != null) return
+        val apps = if (pack == null) FapHubCatalog.bareApps else FapHubCatalog.appsInPack(pack)
+        installApps(apps)
+    }
+
+    fun installApps(apps: List<FapApp>) {
+        if (apps.isEmpty() || _packProgress.value != null) return
         viewModelScope.launch {
-            val apps = if (pack == null) FapHubCatalog.bareApps else FapHubCatalog.appsInPack(pack)
             val failures = mutableListOf<String>()
             apps.forEachIndexed { index, app ->
                 _packProgress.value = "Installing ${index + 1}/${apps.size}: ${app.name}"

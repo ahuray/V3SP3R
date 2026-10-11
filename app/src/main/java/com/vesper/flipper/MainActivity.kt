@@ -105,6 +105,7 @@ sealed class Screen(
     object Alchemy : Screen("alchemy", "Alchemy", Icons.Filled.AutoAwesome, Icons.Outlined.AutoAwesome)
     object OpsCenter : Screen("ops_center", "Ops", Icons.Filled.BluetoothSearching, Icons.Outlined.BluetoothSearching)
     object PayloadLab : Screen("payload_lab", "Payloads", Icons.Filled.Code, Icons.Outlined.Code)
+    object StageRemote : Screen("stage_remote", "Stage", Icons.Filled.SettingsRemote, Icons.Outlined.SettingsRemote)
     object FapHub : Screen("faphub", "FapHub", Icons.Filled.Apps, Icons.Outlined.Apps)
     object Files : Screen("files", "Files", Icons.Filled.Folder, Icons.Outlined.Folder)
     object Audit : Screen("audit", "Audit", Icons.Filled.History, Icons.Outlined.History)
@@ -145,7 +146,8 @@ fun VesperApp() {
                         Screen.Files.route to Screen.Device.route,
                         Screen.Oracle.route to Screen.Device.route,
                         Screen.Arsenal.route to Screen.Device.route,
-                        Screen.PayloadLab.route to Screen.Device.route
+                        Screen.PayloadLab.route to Screen.Device.route,
+                        Screen.StageRemote.route to Screen.Device.route
                     )
                     val currentRoute = currentDestination?.route
                     val effectiveRoute = subScreenParents[currentRoute] ?: currentRoute
@@ -232,6 +234,9 @@ fun VesperApp() {
                         },
                         onNavigateToPayloadLab = {
                             navController.navigate(Screen.PayloadLab.route)
+                        },
+                        onNavigateToStageRemote = {
+                            navController.navigate(Screen.StageRemote.route)
                         }
                     )
                 }
@@ -243,6 +248,11 @@ fun VesperApp() {
                 }
                 composable(Screen.PayloadLab.route) {
                     PayloadLabScreen(
+                        onNavigateBack = { navController.popBackStack() }
+                    )
+                }
+                composable(Screen.StageRemote.route) {
+                    StageRemoteScreen(
                         onNavigateBack = { navController.popBackStack() }
                     )
                 }
