@@ -1,0 +1,9 @@
+Filetype: IR signals file
+Version: 1
+#
+# DEMO PLACEHOLDER — replace with a capture of YOUR OWN TV/projector remote (Infrared app → Learn). NEC example below is a well-known public demo pattern.
+name: POWER_DEMO
+type: parsed
+protocol: NEC
+address: 04 00 00 00
+command: 08 00 00 00
