@@ -51,6 +51,8 @@ WIFI_PAYLOAD = "live_wifi_key_reveal_windows.txt"
 WIFI_ELEVATED_PAYLOAD = "live_wifi_key_reveal_elevated_windows.txt"
 NETSH_PAYLOADS = {WIFI_PAYLOAD, WIFI_ELEVATED_PAYLOAD}
 CRED_PAYLOAD = "live_credential_prompt_windows.txt"
+SPEECH_PAYLOAD = "live_speech_windows.txt"
+PS_PAYLOADS = {CRED_PAYLOAD, SPEECH_PAYLOAD}
 LAB_SSID_PLACEHOLDER = 'name="LAB_SSID_HERE"'
 NETSH_LINE = 'STRING netsh wlan show profile name="LAB_SSID_HERE" key=clear'
 DISCARD_NOTE = "(password was discarded, never stored or sent)"
@@ -561,9 +563,27 @@ def check_payloads() -> list[tuple[bool, str]]:
                 results.append(
                     (True, f"{display}: credential prompt discards the password")
                 )
+        elif name == SPEECH_PAYLOAD:
+            ps_lines = [line for line in lines if "powershell" in line.lower()]
+            if len(ps_lines) != 1 or not ps_lines[0].startswith(
+                "STRING powershell -NoProfile -Command "
+            ):
+                results.append(
+                    (False, f"{display}: powershell must be a single visible command")
+                )
+            elif (
+                "system.speech" not in ps_lines[0].lower()
+                or ".speak(" not in ps_lines[0].lower()
+            ):
+                results.append(
+                    (False, f"{display}: must be local System.Speech text-to-speech")
+                )
+            else:
+                results.append((True, f"{display}: local text-to-speech only"))
         elif "powershell" in text.lower():
+            allowed = ", ".join(sorted(PS_PAYLOADS))
             results.append(
-                (False, f"{display}: powershell is only allowed in {CRED_PAYLOAD}")
+                (False, f"{display}: powershell is only allowed in {allowed}")
             )
     return results
 

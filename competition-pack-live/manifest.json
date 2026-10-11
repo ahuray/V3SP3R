@@ -34,6 +34,12 @@
         },
         {
           "type": "file",
+          "path": "payloads/live_speech_windows.txt",
+          "target": "/ext/badusb/live_speech_windows.txt",
+          "role": "Optional theatrical beat: the sacrificial laptop speaks its own lesson via local Windows text-to-speech (System.Speech). No network, no files, nothing leaves the machine."
+        },
+        {
+          "type": "file",
           "path": "payloads/live_hackertyper_windows.txt",
           "target": "/ext/badusb/live_hackertyper_windows.txt",
           "role": "Comic beat: open hackertyper.net fullscreen on the sacrificial laptop."

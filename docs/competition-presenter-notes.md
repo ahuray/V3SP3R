@@ -37,6 +37,36 @@ Three moments where their hands are on the gear: typing the test credential,
 opening the door with the clone, connecting to the portal. People remember
 what they did, not what they watched.
 
+### Tiny thing, big room — optional crowd moments
+
+Each of these runs only if the authorization record names it; the runbook
+gates apply unchanged.
+
+- **The haunted mouse.** `bettermouse` / `mouse_jiggler` from the installed
+  catalog: plug in, and the cursor moves on its own. Thirty seconds of
+  "the laptop is possessed" before D1 even starts. Perfect cold-open gag for
+  both audiences.
+- **The laptop speaks.** `live_speech_windows.txt` (D1 optional beat): local
+  Windows text-to-speech, no network. The machine says its own lesson out
+  loud. If they quote one sentence in the hallway, it is this one.
+- **Soundbar hijack (D6).** Learn the lab soundbar or demo-room TV's volume
+  or mute key beforehand, then drive it from across the room at the right
+  moment. Nobody believes infrared until the room's speaker obeys a toy.
+  Lab-owned audio gear on the bench card only.
+- **Wall of sheep, lite (D5 optional).** Marauder's probe-request sniffer on
+  the lab network: a seeded lab phone begs for its "home" network,
+  `Pretty Fly for a Wi-Fi`, on screen. The point: every phone is shouting
+  the names of networks it trusts. Seed the phone; do not read personal
+  devices. TODO(verify) the sniffer menu path on the flashed build.
+- **The room buzzes (D8).** The 30-second BLE pairing-popup storm: every
+  listed company phone in range pops a pairing request at once. Phones come
+  out of pockets; the lesson lands by itself.
+
+What the Flipper honestly cannot do — say this if asked, it builds trust:
+it is not a WiFi Pineapple (no real NAT rogue AP with internet; the portal
+is a lab page on the devboard), and it cannot stream audio to a Bluetooth
+speaker (no A2DP). The speaker trick above is infrared, not Bluetooth.
+
 ### Stagecraft that lands
 
 - **Silence is a tool.** When the key appears, stop talking. Count to five.

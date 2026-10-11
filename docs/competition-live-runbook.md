@@ -47,6 +47,7 @@ Install of the live payloads is the same SD-card copy as the safe assets (instal
 | `competition-pack-live/payloads/live_wifi_key_reveal_windows.txt` | `/ext/badusb/live_wifi_key_reveal_windows.txt` | D1. Opens `cmd` and runs the `netsh` line below. Edit `LAB_SSID_HERE` to the lab SSID before the demo. No exfiltration. Nothing written to disk. |
 | `competition-pack-live/payloads/live_wifi_key_reveal_elevated_windows.txt` | `/ext/badusb/live_wifi_key_reveal_elevated_windows.txt` | D1 fallback. Elevated `cmd` via UAC consent for Windows builds that demand admin rights for `key=clear`. Needs a local-admin demo account — if it works, say so, that is a finding. Rehearse both variants; keep the working one on the SD. |
 | `competition-pack-live/payloads/live_credential_prompt_windows.txt` | `/ext/badusb/live_credential_prompt_windows.txt` | D1. Native Windows credential dialog via PowerShell `Get-Credential`. Message text: `LabGuest WiFi Sign-in`. The message box echoes only the typed username. The password is never shown or stored. |
+| `competition-pack-live/payloads/live_speech_windows.txt` | `/ext/badusb/live_speech_windows.txt` | D1 optional theater beat. The laptop speaks its own lesson via local Windows text-to-speech. No network, no files. |
 | `competition-pack-live/payloads/live_hackertyper_windows.txt` | `/ext/badusb/live_hackertyper_windows.txt` | D1 optional laugh beat. Opens hackertyper.net. |
 | `competition-pack-live/evilportal/index.html` | `/ext/apps_data/evil_portal/index.html` (TODO(verify) against the flashed Marauder build) | D5 captive portal. Generic "LabGuest WiFi" branding. Test credentials only. |
 | `competition-pack-live/evilportal/README.md` | Not copied as a payload | Where the verified portal path is written down. |
@@ -79,7 +80,7 @@ Each station keeps the safe runbook's shape: red, then the blue countermeasure, 
 
 **(b) Preconditions.**
 
-- The authorization record lists D1 live (key reveal and credential prompt). List the hackertyper beat on its own line if it will run.
+- The authorization record lists D1 live (key reveal and credential prompt). List the hackertyper and speech beats on their own lines if they will run.
 - `LAB_SSID_HERE` in `live_wifi_key_reveal_windows.txt` has been edited to the lab SSID. The demo account is signed in on the sacrificial laptop, and that SSID's profile is saved on it.
 - Rehearsal on the actual demo laptop picked the key-reveal variant: run the `netsh` line once by hand. If Windows answers that `key=clear` needs elevation (seen on some Windows 11 builds), the elevated variant (`live_wifi_key_reveal_elevated_windows.txt`, UAC consent, local admin) is the one that goes on the SD.
 - The person who will answer the credential dialog has been briefed and will type only the test account.
@@ -93,7 +94,7 @@ Each station keeps the safe runbook's shape: red, then the blue countermeasure, 
 - **0:10–0:35.** Say: "Stock BadUSB, live_wifi_key_reveal_windows.txt. It opens a command prompt and runs netsh for our lab SSID. Anything that can type can read stored keys. Nothing is written to disk." Action: run `/ext/badusb/live_wifi_key_reveal_windows.txt`. TODO(verify) the on-screen run control, same as the safe runbook. Leave the window up so the room can see the key in cleartext. Do not photograph the screen.
 - **0:35–1:00.** Say: "Second file. Native Windows credential dialog. The message is exactly: LabGuest WiFi Sign-in. Our briefed operator types the test account." Action: run `/ext/badusb/live_credential_prompt_windows.txt`. The briefed organizer types the test username and test password.
 - **1:00–1:15.** Say: "The password never left the dialog. A real phish would have taken it. This box shows the username only." Action: point at the message box. Confirm the password is not on screen.
-- **1:15–1:25.** Say: "Laugh beat only if the first two files have already finished: live_hackertyper_windows.txt opens hackertyper.net." Action: run it only in that case, and only on the sacrificial laptop. Otherwise skip.
+- **1:15–1:25.** Say: "Optional beats only if the first two files have already finished: live_speech_windows.txt makes the laptop say its own lesson out loud, live_hackertyper_windows.txt opens hackertyper.net." Action: run the named optional beats only in that case, and only on the sacrificial laptop. Otherwise skip.
 - **1:25–1:30.** Say: "Same cable, same Flipper. Blue is unchanged: this image blocks new HID, and the keyboard never types." Action: follow the safe-runbook D1 blue beat (USB device control). Show the block.
 
 **(d) Stop condition.** If the laptop is not the sacrificial one, do not run the file. If a payload writes a file, copies data off the laptop, shows the password, or does anything other than the `cmd` window, the credential dialog, the username box, or the optional browser page, stop. Close the windows. Power off the devboard if it is attached. Call the organizer.

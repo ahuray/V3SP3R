@@ -18,6 +18,7 @@ sacrificial laptop, and the restore checklist staged. No gate, no demo.
 | `payloads/live_wifi_key_reveal_windows.txt` | BadUSB: `netsh ... key=clear` prints the saved lab WiFi password on the laptop screen. Display only; `LAB_SSID_HERE` placeholder must be edited first. |
 | `payloads/live_wifi_key_reveal_elevated_windows.txt` | Elevated fallback of the same reveal for Windows builds that demand admin rights for `key=clear` (UAC consent via keyboard; needs a local-admin demo account). Rehearse both, keep the one that works. |
 | `payloads/live_credential_prompt_windows.txt` | BadUSB: fake `LabGuest WiFi` sign-in prompt; shows only the typed username. The password is discarded by construction. |
+| `payloads/live_speech_windows.txt` | BadUSB: the laptop speaks its own lesson via local Windows text-to-speech (System.Speech). No network, no files. Theatrical beat. |
 | `payloads/live_hackertyper_windows.txt` | BadUSB: opens hackertyper.net fullscreen. Comic beat, zero impact. |
 | `evilportal/index.html` | Captive-portal phish demo page for the Marauder evil portal on the lab AP. Test credentials only; captures land on the lab SD card and are deleted on stage. |
 | `manifest.json` | Live manifest (categories `red-badusb-live`, `red-wifi-live`). |
