@@ -6,6 +6,31 @@ with props. This file is only the stage layer. The safety gates live in
 `docs/competition-runbook.md` and `docs/competition-live-runbook.md`; nothing
 here relaxes them.
 
+## Pocket control: run the show from the phone (`unsafe`)
+
+The `unsafe` APK ships **Stage Remote** (remote icon in the Device tab). The
+Flipper stays cabled to the sacrificial laptop (D1) or on the bench (D2, D5,
+D6, D8); you fire every beat from the phone over BLE. What this buys you on
+stage:
+
+- You stand next to the screen, not the laptop. The room watches you hold a
+  phone while the laptop types, speaks, and pops dialogs. That separation is
+  the moment the lesson lands: "the toy did it; he never touched the
+  machine."
+- **Push payloads from the phone** (Push payloads section) replaces the
+  SD-card shuffle on demo morning. Push all SAFE for the coworker show, push
+  all LIVE (red confirm) for the exec show, check the on-device indicators.
+- **Beats are one tap.** LIVE beats are red and always confirm in the app
+  first; the executor's risk approval can still follow. Practice the
+  double-tap rhythm (confirm → possible approval) until it is invisible.
+- **Install all stage apps** the day before, from the Stage apps section.
+- Rehearse the whole show from the phone once, on the real hardware, end to
+  end (install guide section 10). Keep the phone in BLE range and keep other
+  BLE clients (qFlipper, official app) disconnected.
+- If BLE hiccups on stage: the Flipper is right there — every beat still
+  runs on-device per the runbook. Say "backup trigger," walk over, press it,
+  keep narrating. Same rule as the video fallback: never debug on stage.
+
 ## For the head of Security (`unsafe`)
 
 ### The arc — 20 minutes, then Q&A

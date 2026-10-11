@@ -28,10 +28,10 @@ Two options: install the prebuilt APK that ships on this branch, or build from s
 
 ### (a) Prebuilt APK on this branch
 
-`vesper-competition-debug.apk` sits at the repo root (gitignore exception `!/vesper-competition-debug.apk`). It is the `assembleDebug` output of `feature/competition-pack`, so it contains the Red Team and Blue Team chips. SHA-256 of the file committed on this branch:
+`vesper-competition-debug.apk` sits at the repo root (gitignore exception `!/vesper-competition-debug.apk`). On the `unsafe` branch it is the `assembleDebug` output of `unsafe`: Red Team and Blue Team chips plus the Stage Remote screen (section 10) with the competition payloads bundled. SHA-256 of the file committed on this branch:
 
 ```text
-7f5081bcaf14ef6f915e755132bd7d9db08ea21bef5b1707d7b3a9ca43669a4b
+d25c18f0ab3da9970c56b03ca8352ce846e1dc3b347d0e1b379f2d472e2fecc7
 ```
 
 Check it before installing: `sha256sum vesper-competition-debug.apk`. If you rebuild locally (option b), expect a different hash — debug builds are not reproducible.
@@ -239,3 +239,17 @@ python3 validate_live_pack.py
 ```
 
 A clean run prints `PACK LIVE OK`. Any other result is a failed check.
+
+## 10. Stage Remote (unsafe branch only)
+
+The `unsafe` APK adds a **Stage Remote** screen: demo beats triggered from the phone over BLE while the Flipper stays cabled to the target (BadUSB) or on the bench (D2, D5, D6, D8). Open it from the remote icon in the Device top bar.
+
+**Physics.** The Flipper must still be USB-cabled to the sacrificial laptop for D1 (it is the keyboard). The phone only replaces walking up to the Flipper and pressing its buttons. Keep the phone within BLE range of the Flipper, and keep other BLE clients (qFlipper, the official app) disconnected — one session at a time.
+
+Three sections:
+
+- **Beats.** One card per demo beat. SAFE cards are the three dummy D1 scripts and run immediately. LIVE cards (all five live D1 payloads, haunted mouse, soundbar IR, Sub-GHz replay, BLE room buzz, Start WiFi station) are red and always ask for confirmation in the app first; the executor's own risk approval can still follow. Beats run through the same CommandExecutor path as the rest of the app, so they are audited.
+- **Push payloads.** The APK bundles `competition-pack/badusb` and `competition-pack-live` as assets (synced by `scripts/sync_stage_assets.py`; the live validator fails if they drift). Push any file to the Flipper over BLE: scripts land in `/ext/badusb/`, the portal page in `/ext/apps_data/evil_portal/index.html` (the folder is created on first push if missing). On-device indicators show what is already there. This replaces the SD-card shuffle in section 9 for the payload files.
+- **Stage apps.** The nine stage-relevant catalog apps with installed indicators and Install / Install all, using the same download path as FapHub.
+
+Before demo day, rehearse the whole show from the phone once: every beat you will fire, on the real laptop and AP. TODO(verify) on-device: BadUSB while cabled, IR/Sub-GHz file pickers, BLE spam when the firmware plugin is missing, and the portal-folder create-on-push.

@@ -40,7 +40,7 @@ python3 validate_live_pack.py
 
 A clean live run prints `PACK LIVE OK`. Any other output is a failed check. Do not perform a live station on a failed check.
 
-Install of the live payloads is the same SD-card copy as the safe assets (install guide section 5, SD reader or qFlipper). Computer-side notes and the validator stay on the computer.
+Install of the live payloads is the same SD-card copy as the safe assets (install guide section 5, SD reader or qFlipper) — or push them from the phone with Stage Remote (install guide section 10), which also fires beats over BLE during the show. Computer-side notes and the validator stay on the computer.
 
 | Repo file | Flipper path | Role |
 | --- | --- | --- |
