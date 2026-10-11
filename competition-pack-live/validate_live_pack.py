@@ -15,13 +15,59 @@ Paths resolve relative to this script. Standard library only.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import sys
 from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parent
-SAFE_BADUSB = ROOT.parent / "competition-pack" / "badusb"
+REPO = ROOT.parent
+SAFE_BADUSB = REPO / "competition-pack" / "badusb"
+STAGE_ASSET_DIR = REPO / "app" / "src" / "main" / "assets" / "stage"
+SHA256_RE = re.compile(r"[0-9a-fA-F]{64}")
+SYNCED_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
+
+# (source relative to the repo root, asset path relative to app/src/main/assets)
+# Keep in lockstep with scripts/sync_stage_assets.py STAGE_COPIES.
+STAGE_COPIES: tuple[tuple[str, str], ...] = (
+    (
+        "competition-pack/badusb/demo_calc_windows.txt",
+        "stage/safe/demo_calc_windows.txt",
+    ),
+    (
+        "competition-pack/badusb/demo_notepad_hello_windows.txt",
+        "stage/safe/demo_notepad_hello_windows.txt",
+    ),
+    (
+        "competition-pack/badusb/demo_rickroll_windows.txt",
+        "stage/safe/demo_rickroll_windows.txt",
+    ),
+    (
+        "competition-pack-live/payloads/live_wifi_key_reveal_windows.txt",
+        "stage/live/live_wifi_key_reveal_windows.txt",
+    ),
+    (
+        "competition-pack-live/payloads/live_wifi_key_reveal_elevated_windows.txt",
+        "stage/live/live_wifi_key_reveal_elevated_windows.txt",
+    ),
+    (
+        "competition-pack-live/payloads/live_credential_prompt_windows.txt",
+        "stage/live/live_credential_prompt_windows.txt",
+    ),
+    (
+        "competition-pack-live/payloads/live_speech_windows.txt",
+        "stage/live/live_speech_windows.txt",
+    ),
+    (
+        "competition-pack-live/payloads/live_hackertyper_windows.txt",
+        "stage/live/live_hackertyper_windows.txt",
+    ),
+    (
+        "competition-pack-live/evilportal/index.html",
+        "stage/live/evilportal/index.html",
+    ),
+)
 
 MIN_ENTRIES = 3
 MAX_ENTRIES = 7
@@ -681,6 +727,113 @@ def check_readme() -> tuple[bool, str]:
     return True, "README.md carries the lab banner and runbook gate"
 
 
+def file_sha256(path: Path) -> tuple[str | None, str]:
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest(), ""
+    except OSError as exc:
+        return None, str(exc)
+
+
+def check_phone_stage_assets() -> list[tuple[bool, str]]:
+    """Phone APK stage assets match pack sources and stage/manifest.json."""
+    label = "phone stage assets in sync"
+    if not STAGE_ASSET_DIR.is_dir():
+        return [(False, f"{label}: app/src/main/assets/stage does not exist")]
+
+    results: list[tuple[bool, str]] = []
+    asset_hashes: dict[str, str] = {}
+    for source_rel, asset_rel in STAGE_COPIES:
+        source = REPO / source_rel
+        asset = REPO / "app" / "src" / "main" / "assets" / asset_rel
+        if not source.is_file():
+            results.append((False, f"{label}: source missing {source_rel}"))
+            source_hash = None
+        else:
+            source_hash, source_err = file_sha256(source)
+            if source_hash is None:
+                results.append((False, f"{label}: {source_rel}: {source_err}"))
+        if not asset.is_file():
+            results.append((False, f"{label}: asset missing {asset_rel}"))
+            continue
+        asset_hash, asset_err = file_sha256(asset)
+        if asset_hash is None:
+            results.append((False, f"{label}: {asset_rel}: {asset_err}"))
+            continue
+        asset_hashes[asset_rel] = asset_hash
+        if source_hash is None:
+            continue
+        if source_hash != asset_hash:
+            results.append(
+                (False, f"{label}: {asset_rel} sha256 does not match {source_rel}")
+            )
+        else:
+            results.append((True, f"{label}: {asset_rel} matches {source_rel}"))
+
+    results.extend(check_stage_manifest(asset_hashes))
+    return results
+
+
+def check_stage_manifest(asset_hashes: dict[str, str]) -> list[tuple[bool, str]]:
+    label = "phone stage assets in sync"
+    path = STAGE_ASSET_DIR / "manifest.json"
+    if not path.is_file():
+        return [(False, f"{label}: stage/manifest.json is missing")]
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        return [(False, f"{label}: stage/manifest.json cannot be read ({exc})")]
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        return [
+            (
+                False,
+                f"{label}: stage/manifest.json is not valid JSON "
+                f"({exc.msg} at line {exc.lineno})",
+            )
+        ]
+    if not isinstance(data, dict):
+        return [(False, f"{label}: stage/manifest.json must be a JSON object")]
+
+    problems: list[str] = []
+    allowed = {"synced", "files"}
+    missing_keys = sorted(allowed - set(data))
+    extra_keys = sorted(set(data) - allowed)
+    if missing_keys:
+        problems.append("missing " + ", ".join(missing_keys))
+    if extra_keys:
+        problems.append("unexpected " + ", ".join(extra_keys))
+    synced = data.get("synced")
+    if "synced" in data and (
+        not isinstance(synced, str) or SYNCED_RE.fullmatch(synced) is None
+    ):
+        problems.append("synced must be YYYY-MM-DD")
+
+    files = data.get("files")
+    managed = [asset_rel for _, asset_rel in STAGE_COPIES]
+    if "files" in data and not isinstance(files, dict):
+        problems.append("files must be an object")
+    elif isinstance(files, dict):
+        for asset_rel in managed:
+            recorded = files.get(asset_rel)
+            actual = asset_hashes.get(asset_rel)
+            if not isinstance(recorded, str) or SHA256_RE.fullmatch(recorded) is None:
+                problems.append(f"{asset_rel} missing from manifest")
+                continue
+            if actual is None:
+                problems.append(f"{asset_rel} listed but asset unreadable")
+                continue
+            if recorded.lower() != actual:
+                problems.append(f"{asset_rel} manifest hash does not match asset")
+        extras = sorted(set(files) - set(managed))
+        if extras:
+            problems.append("unexpected manifest entries: " + ", ".join(extras))
+
+    if problems:
+        return [(False, f"{label}: stage/manifest.json: " + "; ".join(problems))]
+    return [(True, f"{label}: stage/manifest.json hashes match the asset files")]
+
+
 def load_manifest() -> tuple[dict | None, str]:
     path = ROOT / "manifest.json"
     try:
@@ -737,6 +890,7 @@ def collect() -> list[tuple[bool, str]]:
     results.append(check_cross_pack_guard())
     results.extend(check_evilportal())
     results.append(check_readme())
+    results.extend(check_phone_stage_assets())
     return results
 
 

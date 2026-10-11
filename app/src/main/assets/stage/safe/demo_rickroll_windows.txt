@@ -1,0 +1,10 @@
+REM V3SP3R Security Competition Pack
+REM Harmless rickroll for the demo. HID injection opens the default browser to a public video.
+REM This payload does not download files or change settings.
+REM Own test machine only.
+DELAY 1000
+GUI r
+DELAY 750
+STRING https://www.youtube.com/watch?v=dQw4w9WgXcQ
+DELAY 500
+ENTER

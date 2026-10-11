@@ -1,0 +1,14 @@
+{
+  "synced": "2026-10-11",
+  "files": {
+    "stage/safe/demo_calc_windows.txt": "a7beef5b92521da3e2e13ce6b97dfe936385d1ba94241a3607fb142856df5e9d",
+    "stage/safe/demo_notepad_hello_windows.txt": "82cf5eab2bcfb257aa81cf81c47b51d26c3c1ff8711f222ee7ff9cf15f02a0d7",
+    "stage/safe/demo_rickroll_windows.txt": "467dd69bcbc5619a0eb8c17463084f0235f413435701d050d2399ef3740f5328",
+    "stage/live/live_wifi_key_reveal_windows.txt": "9cc09d34842dd506625bf998498d5363b91d6ab71b3c0df738dec120d87616ca",
+    "stage/live/live_wifi_key_reveal_elevated_windows.txt": "d18347bcf9507e9f7d21b66d271215751491b816b5354e1969644f5d64adea0b",
+    "stage/live/live_credential_prompt_windows.txt": "2c47d86a0b992c870dda9954d81f3f71ccc38b56a6ae67689e7e77821ed9723d",
+    "stage/live/live_speech_windows.txt": "1ba19e6a3f14a18eda693d70791c097edf820462fd8ed87c227a278ad8b00926",
+    "stage/live/live_hackertyper_windows.txt": "37be55116720ec931fa5591195c841fb377a77ac4847bf53cf6bab8866349bc6",
+    "stage/live/evilportal/index.html": "2993fa65d3e75722fcc848bf9fe04b8a5576499ccf2e46f3c1717712f9ddb1c7"
+  }
+}
