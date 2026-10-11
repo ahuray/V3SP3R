@@ -1,0 +1,17 @@
+REM ============================================================
+REM LAB USE ONLY - authorized demo on your own laptop
+REM ============================================================
+REM Theatrical beat for D1: the sacrificial laptop SPEAKS to the
+REM room. Local Windows text-to-speech only (System.Speech). No
+REM network, no files, nothing leaves the machine. If the room
+REM remembers one sentence today, let the laptop say it.
+REM
+REM Scope: run only on the sacrificial demo laptop, after the
+REM authorization gate in docs/competition-live-runbook.md.
+REM ============================================================
+
+DELAY 2000
+GUI r
+DELAY 500
+STRING powershell -NoProfile -Command "Add-Type -AssemblyName System.Speech; $s = New-Object System.Speech.Synthesis.SpeechSynthesizer; $s.Speak('Attention please. This is the demo laptop speaking. I was left unlocked for ten seconds, and a fifty dollar toy is now using my voice. Lock your screen when you stand up.')"
+ENTER

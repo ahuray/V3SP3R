@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Vesper Brand Colors — Terminal / Phosphor Hacker -->
+    <color name="vesper_primary">#0E7D47</color>
+    <color name="vesper_primary_dark">#084F2D</color>
+    <color name="vesper_secondary">#0E1613</color>
+    <color name="vesper_accent">#F4B740</color>
+
+    <!-- Surface Colors -->
+    <color name="vesper_surface">#0A110E</color>
+    <color name="vesper_surface_variant">#101A15</color>
+    <color name="vesper_background">#060A08</color>
+
+    <!-- Text Colors -->
+    <color name="vesper_on_primary">#EAF6EF</color>
+    <color name="vesper_on_surface">#D7E4DD</color>
+    <color name="vesper_on_surface_variant">#7C8F86</color>
+
+    <!-- Risk Colors -->
+    <color name="risk_low">#2DE37E</color>
+    <color name="risk_medium">#F4B740</color>
+    <color name="risk_high">#FF5C66</color>
+    <color name="risk_blocked">#5E6E66</color>
+
+    <!-- Diff Colors -->
+    <color name="diff_added">#2DE37E</color>
+    <color name="diff_removed">#FF5C66</color>
+    <color name="diff_changed">#F4B740</color>
+</resources>

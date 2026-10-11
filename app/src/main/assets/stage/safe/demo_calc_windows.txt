@@ -1,0 +1,9 @@
+REM V3SP3R Security Competition Pack
+REM Demo: HID injection. Opens the Windows Run dialog and starts Calculator.
+REM Own test machine only.
+DELAY 1000
+GUI r
+DELAY 750
+STRING calc
+DELAY 500
+ENTER

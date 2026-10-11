@@ -1,0 +1,11 @@
+REM V3SP3R Security Competition Pack
+REM Demo: HID injection. Opens Notepad and types a friendly lock-screen reminder.
+REM Own test machine only.
+DELAY 1000
+GUI r
+DELAY 750
+STRING notepad
+DELAY 500
+ENTER
+DELAY 1500
+STRING V3SP3R security demo: this could have been malware. Lock your PC when you step away!

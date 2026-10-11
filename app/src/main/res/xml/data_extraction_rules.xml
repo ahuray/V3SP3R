@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="sharedpref" path="."/>
+        <!-- Encrypted API keys are keystore-bound and cannot be restored elsewhere. -->
+        <exclude domain="sharedpref" path="vesper_secure_prefs.xml"/>
+    </cloud-backup>
+    <device-transfer>
+        <include domain="sharedpref" path="."/>
+        <exclude domain="sharedpref" path="vesper_secure_prefs.xml"/>
+    </device-transfer>
+</data-extraction-rules>

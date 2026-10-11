@@ -1,0 +1,16 @@
+REM ============================================================
+REM LAB USE ONLY - authorized demo on your own laptop
+REM ============================================================
+REM Comic beat: opens hackertyper.net in the default browser
+REM and goes fullscreen. Pure theater, zero system impact.
+REM Pair it with the serious payloads so the audience leaves
+REM remembering the lesson, not just the fear.
+REM ============================================================
+
+DELAY 2000
+GUI r
+DELAY 500
+STRING https://hackertyper.net
+ENTER
+DELAY 2500
+F11

@@ -1,0 +1,11 @@
+# DEMO PLACEHOLDER — will NOT open anything
+# TODO capture your own remote (Flipper → Sub-GHz → Read → Save)
+# Never capture third-party signals.
+Filetype: Flipper SubGhz Key File
+Version: 1
+Frequency: 433920000
+Preset: FuriHalSubGhzPresetOok650Async
+Protocol: Princeton
+Bit: 24
+Key: 00 00 00 00 00 DE AD BE EF
+TE: 400

@@ -1,0 +1,25 @@
+# CodeRabbit configuration for V3SP3R / Vesper
+# https://docs.coderabbit.ai/reference/configuration
+language: en-US
+
+reviews:
+  profile: assertive
+  path_filters:
+    # Exclude generated Flipper protobuf stubs (auto-generated, not hand-maintained)
+    - "!app/src/main/java/com/flipperdevices/protobuf/**"
+    # Exclude build and dependency artifacts
+    - "!**/build/**"
+    - "!**/node_modules/**"
+    - "!gradle/wrapper/**"
+  path_instructions:
+    - path: "app/src/main/java/com/vesper/flipper/ui/**"
+      instructions: >-
+        This is Jetpack Compose UI (Material 3). Flag accessibility gaps
+        (missing contentDescription, touch targets < 48dp, hardcoded colors
+        instead of MaterialTheme, missing state for loading/empty/error),
+        recompositions caused by unstable lambdas or unremembered state, and
+        blocking work on the main thread.
+    - path: "app/src/main/java/com/vesper/flipper/ble/**"
+      instructions: >-
+        BLE and device transport. Flag unclosed resources, missing timeouts,
+        unhandled disconnects, race conditions, and runtime-permission gaps.

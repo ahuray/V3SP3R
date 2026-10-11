@@ -1,0 +1,365 @@
+{
+  "id": "vesper-security-competition",
+  "name": "V3SP3R Security Competition Pack",
+  "version": "1.0.0",
+  "generated": "2026-10-11",
+  "firmware": {
+    "fork": "unleashed",
+    "sdkApiMajor": 88,
+    "note": "Apps resolve from catalog.flipperzero.one pinned to the device-reported SDK API; Unleashed accepts same-major builds (loader compares API major only)."
+  },
+  "categories": [
+    {
+      "id": "red-badusb",
+      "title": "BadUSB",
+      "entries": [
+        {
+          "type": "catalog-app",
+          "alias": "usb_hid_autofire",
+          "name": "USB HID Autofire",
+          "pack": "red",
+          "needsModule": false,
+          "role": "Show automated HID keystroke playback on a test PC at the BadUSB station.",
+          "source": "https://catalog.flipperzero.one"
+        },
+        {
+          "type": "catalog-app",
+          "alias": "bettermouse",
+          "name": "Better Mouse",
+          "pack": "red",
+          "needsModule": false,
+          "role": "Show a scripted USB mouse on a test PC so players can see HID pointer control.",
+          "source": "https://catalog.flipperzero.one"
+        },
+        {
+          "type": "catalog-app",
+          "alias": "mouse_jiggler",
+          "name": "Mouse Jiggler",
+          "pack": "edge",
+          "needsModule": false,
+          "role": "Show a mouse-presence keepalive the blue team can recognize as an idle-prevention HID device.",
+          "source": "https://catalog.flipperzero.one"
+        },
+        {
+          "type": "builtin",
+          "name": "BadUSB (stock firmware app)",
+          "role": "Run the stock BadUSB app on the demo DuckyScript files shipped in this pack."
+        },
+        {
+          "type": "file",
+          "path": "badusb/demo_calc_windows.txt",
+          "target": "/ext/badusb/demo_calc_windows.txt",
+          "role": "Harmless HID demo: open Windows Calculator on your own test machine."
+        },
+        {
+          "type": "file",
+          "path": "badusb/demo_notepad_hello_windows.txt",
+          "target": "/ext/badusb/demo_notepad_hello_windows.txt",
+          "role": "Harmless HID demo: open Notepad and type a lock-your-PC reminder."
+        },
+        {
+          "type": "file",
+          "path": "badusb/demo_rickroll_windows.txt",
+          "target": "/ext/badusb/demo_rickroll_windows.txt",
+          "role": "Harmless HID demo: open a browser rickroll on your own test machine."
+        }
+      ]
+    },
+    {
+      "id": "red-subghz",
+      "title": "Sub-GHz",
+      "entries": [
+        {
+          "type": "catalog-app",
+          "alias": "sub_analyzer",
+          "name": "Sub Analyzer",
+          "pack": "red",
+          "needsModule": false,
+          "role": "Inspect a Sub-GHz capture taken from a remote you own.",
+          "source": "https://catalog.flipperzero.one"
+        },
+        {
+          "type": "catalog-app",
+          "alias": "subghz_raw_edit",
+          "name": "Sub-GHz RAW Edit",
+          "pack": "red",
+          "needsModule": false,
+          "role": "Edit a raw Sub-GHz capture taken from equipment you own.",
+          "source": "https://catalog.flipperzero.one"
+        },
+        {
+          "type": "catalog-app",
+          "alias": "subhound",
+          "name": "Subhound",
+          "pack": "red",
+          "needsModule": false,
+          "role": "Classify and label Sub-GHz BinRAW captures from the lab remote.",
+          "source": "https://catalog.flipperzero.one"
+        },
+        {
+          "type": "catalog-app",
+          "alias": "protoview",
+          "name": "ProtoView",
+          "pack": "radio",
+          "needsModule": false,
+          "role": "Visualize timing of an unknown protocol in a lab capture from gear you own.",
+          "source": "https://catalog.flipperzero.one"
+        },
+        {
+          "type": "catalog-app",
+          "alias": "subghz_remote_ofw",
+          "name": "Sub-GHz Remote",
+          "pack": "daily",
+          "needsModule": false,
+          "role": "Organize saved remotes you own into a stock-style remote list.",
+          "source": "https://catalog.flipperzero.one"
+        },
+        {
+          "type": "file",
+          "path": "subghz/demo_remote_TODO.sub",
+          "target": "/ext/subghz/demo_remote_TODO.sub",
+          "role": "Placeholder Princeton key that will not open anything; replace it on the lab SD card with a capture of your own remote."
+        }
+      ]
+    },
+    {
+      "id": "red-nfc-rfid",
+      "title": "NFC / RFID",
+      "entries": [
+        {
+          "type": "catalog-app",
+          "alias": "t5577_writer",
+          "name": "T5577 Raw Writer",
+          "pack": "red",
+          "needsModule": false,
+          "role": "Write a T5577 tag the organizers provisioned for the lab.",
+          "source": "https://catalog.flipperzero.one"
+        },
+        {
+          "type": "catalog-app",
+          "alias": "rfid_maker",
+          "name": "RFID Maker",
+          "pack": "red",
+          "needsModule": false,
+          "role": "Build a lab RFID test card from organizer-issued test data.",
+          "source": "https://catalog.flipperzero.one"
+        },
+        {
+          "type": "catalog-app",
+          "alias": "wiegand_reader",
+          "name": "Wiegand Reader",
+          "pack": "red",
+          "needsModule": false,
+          "role": "Read Wiegand from the lab test reader wiring.",
+          "source": "https://catalog.flipperzero.one"
+        },
+        {
+          "type": "catalog-app",
+          "alias": "nfc_magic",
+          "name": "NFC Magic",
+          "pack": "edge",
+          "needsModule": false,
+          "role": "Audit magic and Gen1a test cards at the badge station.",
+          "source": "https://catalog.flipperzero.one"
+        },
+        {
+          "type": "catalog-app",
+          "alias": "picopass",
+          "name": "PicoPass",
+          "pack": "edge",
+          "needsModule": false,
+          "role": "Read PicoPass test cards issued for the lab.",
+          "source": "https://catalog.flipperzero.one"
+        },
+        {
+          "type": "builtin",
+          "name": "Stock NFC app (magic/Gen1a card detection)",
+          "role": "Detect magic and Gen1a cards with the stock NFC app on badges you are authorized to audit."
+        }
+      ]
+    },
+    {
+      "id": "red-wifi",
+      "title": "Wi-Fi",
+      "entries": [
+        {
+          "type": "catalog-app",
+          "alias": "esp32_wifi_marauder",
+          "name": "WiFi Marauder",
+          "pack": "red",
+          "needsModule": true,
+          "role": "Run the Wi-Fi station on the isolated lab network. Requires the ESP32-S2 Wi-Fi devboard.",
+          "source": "https://catalog.flipperzero.one"
+        },
+        {
+          "type": "catalog-app",
+          "alias": "esp_flasher",
+          "name": "ESP Flasher",
+          "pack": "red",
+          "needsModule": true,
+          "role": "Flash the ESP32-S2 Wi-Fi devboard used by the Wi-Fi station.",
+          "source": "https://catalog.flipperzero.one"
+        },
+        {
+          "type": "catalog-app",
+          "alias": "flipper_http",
+          "name": "FlipperHTTP",
+          "pack": "red",
+          "needsModule": true,
+          "role": "HTTP client demo through the ESP32-S2 Wi-Fi devboard on the lab network.",
+          "source": "https://catalog.flipperzero.one"
+        }
+      ]
+    },
+    {
+      "id": "red-ir",
+      "title": "Infrared",
+      "entries": [
+        {
+          "type": "catalog-app",
+          "alias": "xremote",
+          "name": "Cross Remote",
+          "pack": "red",
+          "needsModule": false,
+          "role": "Drive a universal-remote layout learned from your own AV gear.",
+          "source": "https://catalog.flipperzero.one"
+        },
+        {
+          "type": "catalog-app",
+          "alias": "flipirfreq",
+          "name": "FlipIRFreq",
+          "pack": "red",
+          "needsModule": false,
+          "role": "Check the infrared carrier while learning a remote you own.",
+          "source": "https://catalog.flipperzero.one"
+        },
+        {
+          "type": "catalog-app",
+          "alias": "ir_scope",
+          "name": "IR Scope",
+          "pack": "radio",
+          "needsModule": false,
+          "role": "Scope infrared timing from a remote you own before you save it.",
+          "source": "https://catalog.flipperzero.one"
+        },
+        {
+          "type": "file",
+          "path": "infrared/demo_tv_power_TODO.ir",
+          "target": "/ext/infrared/demo_tv_power_TODO.ir",
+          "role": "Placeholder NEC power pattern; learn your own TV or projector remote onto the lab SD card."
+        }
+      ]
+    },
+    {
+      "id": "red-gpio",
+      "title": "GPIO",
+      "entries": [
+        {
+          "type": "catalog-app",
+          "alias": "signal_generator",
+          "name": "Signal Generator",
+          "pack": "red",
+          "needsModule": false,
+          "role": "Generate a known test signal on the GPIO bench.",
+          "source": "https://catalog.flipperzero.one"
+        },
+        {
+          "type": "catalog-app",
+          "alias": "uart_terminal",
+          "name": "UART Terminal",
+          "pack": "red",
+          "needsModule": false,
+          "role": "Open a UART console to a lab device you own.",
+          "source": "https://catalog.flipperzero.one"
+        },
+        {
+          "type": "catalog-app",
+          "alias": "spi_mem_manager",
+          "name": "SPI Mem Manager",
+          "pack": "red",
+          "needsModule": false,
+          "role": "Read SPI flash on a lab fixture the organizers wired up.",
+          "source": "https://catalog.flipperzero.one"
+        },
+        {
+          "type": "catalog-app",
+          "alias": "logic_analyzer",
+          "name": "Logic Analyzer",
+          "pack": "red",
+          "needsModule": false,
+          "role": "Capture digital timing on the GPIO bench.",
+          "source": "https://catalog.flipperzero.one"
+        }
+      ]
+    },
+    {
+      "id": "blue",
+      "title": "Blue team",
+      "entries": [
+        {
+          "type": "catalog-app",
+          "alias": "access_audit",
+          "name": "Access Audit",
+          "pack": "blue",
+          "needsModule": false,
+          "role": "Review access-control cards the organizers issued for this exercise.",
+          "source": "https://catalog.flipperzero.one"
+        },
+        {
+          "type": "catalog-app",
+          "alias": "seader",
+          "name": "Seader",
+          "pack": "blue",
+          "needsModule": false,
+          "role": "Open Seader against test credentials the organizers issued for this station.",
+          "source": "https://catalog.flipperzero.one"
+        },
+        {
+          "type": "catalog-app",
+          "alias": "seos",
+          "name": "Seos Compatible",
+          "pack": "blue",
+          "needsModule": false,
+          "role": "Check Seos-compatible test cards issued for the competition.",
+          "source": "https://catalog.flipperzero.one"
+        },
+        {
+          "type": "catalog-app",
+          "alias": "radio_scanner",
+          "name": "Radio Scanner",
+          "pack": "blue",
+          "needsModule": false,
+          "role": "Listen for unexpected radio activity during the blue-team sweep.",
+          "source": "https://catalog.flipperzero.one"
+        },
+        {
+          "type": "catalog-app",
+          "alias": "emrtd",
+          "name": "eMRTD Reader",
+          "pack": "blue",
+          "needsModule": false,
+          "role": "Read your own e-passport or ID card over NFC (PACE/BAC) to show exactly what the document exposes.",
+          "source": "https://catalog.flipperzero.one"
+        },
+        {
+          "type": "catalog-app",
+          "alias": "flip_wifi",
+          "name": "FlipWiFi",
+          "pack": "blue",
+          "needsModule": true,
+          "role": "Scan for rogue APs on the lab network through the ESP32-S2 Wi-Fi devboard (needs FlipperHTTP).",
+          "source": "https://catalog.flipperzero.one"
+        },
+        {
+          "type": "catalog-app",
+          "alias": "findmy",
+          "name": "FindMy Flipper",
+          "pack": "edge",
+          "needsModule": false,
+          "role": "plant an AirTag-class Find My beacon for the tracker-sweep demo",
+          "source": "https://catalog.flipperzero.one"
+        }
+      ]
+    }
+  ]
+}
