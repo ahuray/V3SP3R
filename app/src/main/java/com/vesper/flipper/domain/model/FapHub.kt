@@ -44,6 +44,8 @@ enum class FapPack(val displayName: String) {
     @SerialName("radio") RADIO("Radio"),
     @SerialName("edge") EDGE("Edge"),
     @SerialName("play") PLAY("Play"),
+    @SerialName("red") RED("Red Team"),
+    @SerialName("blue") BLUE("Blue Team"),
 }
 
 @Serializable
@@ -310,8 +312,9 @@ object FlipperResourceLibrary {
  * On-device pack for a stock Flipper Zero.
  *
  * Every entry is a real Flipper application-catalog alias. Install resolves the
- * compiled FAP for the connected firmware's SDK. Nothing here needs a Wi-Fi
- * board, GPS, or GPIO module.
+ * compiled FAP for the connected firmware's SDK. Entries flagged needsModule
+ * (only in the Red Team / Blue Team competition packs) also need the ESP32-S2
+ * WiFi devboard; everything else runs on a stock Flipper Zero.
  */
 object FapHubCatalog {
 
@@ -364,6 +367,33 @@ object FapHubCatalog {
         add(packApp("usb_midi", "USB-MIDI", "Turn the Flipper into a USB MIDI controller.", FapCategory.USB, "USB", "@Kribesk", "1.0", FapPack.PLAY))
         add(packApp("morse_trainer", "Morse Trainer", "Learn Morse from zero, one level at a time.", FapCategory.GAMES, "Games", "Baris Mert", "1.0", FapPack.PLAY))
         add(packApp("brainfuck", "Brainfuck", "Brainfuck interpreter on the Flipper.", FapCategory.TOOLS, "Tools", "@nymda", "1.4", FapPack.PLAY))
+
+        // Security competition pack — Red Team
+        add(packApp("sub_analyzer", "Sub Analyzer", "Dissect any .sub capture: protocol, timing, and key bits for replay analysis.", FapCategory.SUBGHZ, "Sub-GHz", "RocketGod", "1.0", FapPack.RED))
+        add(packApp("subghz_raw_edit", "Sub-GHz RAW Edit", "Trim RAW Sub-GHz captures on-device down to the exact burst to replay.", FapCategory.SUBGHZ, "Sub-GHz", "Lechnio", "1.7", FapPack.RED))
+        add(packApp("subhound", "Subhound", "Classify Sub-GHz BinRAW captures on-device and label unknown signals.", FapCategory.SUBGHZ, "Sub-GHz", "maxwalks", "1.2", FapPack.RED))
+        add(packApp("t5577_writer", "T5577 Raw Writer", "Write raw blocks to T5577 125 kHz tags — clone your own RFID badges.", FapCategory.NFC, "RFID", "Torron", "1.2", FapPack.RED))
+        add(packApp("rfid_maker", "RFID Maker", "Build 125 kHz RFID files from facility codes and card numbers for your own badges.", FapCategory.NFC, "RFID", "KindaCharming", "0.9", FapPack.RED))
+        add(packApp("wiegand_reader", "Wiegand Reader", "Read and send Wiegand access-control data over GPIO wires (D0/D1/GND).", FapCategory.GPIO, "GPIO", "Derek Jamison (@CodeAllNight)", "1.4", FapPack.RED))
+        add(packApp("esp32_wifi_marauder", "WiFi Marauder", "Companion for ESP32 Marauder: WiFi scan and packet tools on your WiFi devboard.", FapCategory.GPIO, "GPIO", "Flipper catalog", "7.6", FapPack.RED, needsModule = true))
+        add(packApp("esp_flasher", "ESP Flasher", "Flash ESP32 firmware (e.g. Marauder) straight from the Flipper — no PC needed.", FapCategory.GPIO, "GPIO", "Flipper catalog", "1.7", FapPack.RED, needsModule = true))
+        add(packApp("flipper_http", "FlipperHTTP", "HTTP bridge companion used by WiFi devboard apps such as FlipWiFi.", FapCategory.GPIO, "GPIO", "JBlanked", "1.1", FapPack.RED, needsModule = true))
+        add(packApp("xremote", "Cross Remote", "Universal IR remote: learn signals from your own remotes, multi-device layouts.", FapCategory.INFRARED, "Infrared", "Leedave", "3.5", FapPack.RED))
+        add(packApp("flipirfreq", "FlipIRFreq", "Send IR with adjustable carrier frequency, duty cycle, and pulse mode.", FapCategory.INFRARED, "Infrared", "Flipper catalog", "0.2", FapPack.RED))
+        add(packApp("signal_generator", "Signal Generator", "Generate digital signals on GPIO pins for replay and bench tests.", FapCategory.GPIO, "GPIO", "@nminaylov", "1.2", FapPack.RED))
+        add(packApp("uart_terminal", "UART Terminal", "Talk to devices over UART from the Flipper GPIO header.", FapCategory.GPIO, "GPIO", "@cool4uma & @rnadyrshin", "1.7", FapPack.RED))
+        add(packApp("spi_mem_manager", "SPI Mem Manager", "Read and write 25-series SPI flash chips — audit your own hardware.", FapCategory.GPIO, "GPIO", "@drunkbatya", "1.5", FapPack.RED))
+        add(packApp("logic_analyzer", "Logic Analyzer", "Openbench Logic Sniffer mode: probe GPIO signals with PulseView.", FapCategory.GPIO, "GPIO", "@g3gg0", "1.0", FapPack.RED))
+        add(packApp("usb_hid_autofire", "USB HID Autofire", "Send rapid USB HID left-clicks — demo HID injection without scripting.", FapCategory.USB, "USB", "@pbek", "1.1", FapPack.RED))
+        add(packApp("bettermouse", "Better Mouse", "USB mouse remote with motion engine — shows how HID devices drive a host.", FapCategory.USB, "USB", "timon", "1.2", FapPack.RED))
+
+        // Security competition pack — Blue Team
+        add(packApp("access_audit", "Access Audit", "Audit your own NFC/RFID/HID iCLASS badges: DESFire, MIFARE Classic/Plus, weak keys.", FapCategory.NFC, "Tools", "Matthew Kayne", "1.13", FapPack.BLUE))
+        add(packApp("seader", "Seader", "Read credentials from HID iClass, iClass SE, DESFire EV1/EV2, Seos badges you own.", FapCategory.NFC, "NFC", "bettse", "4.2", FapPack.BLUE))
+        add(packApp("seos", "Seos Compatible", "Read and emulate Seos credentials — verify what your own badges expose.", FapCategory.NFC, "NFC", "bettse", "1.3", FapPack.BLUE))
+        add(packApp("radio_scanner", "Radio Scanner", "Sub-GHz scanner with audio out — sweep for unexpected transmitters.", FapCategory.SUBGHZ, "Sub-GHz", "@RocketGod-git", "0.2", FapPack.BLUE))
+        add(packApp("flip_wifi", "FlipWiFi", "Scan and save WiFi networks via the WiFi devboard — rogue-AP sweep (needs FlipperHTTP).", FapCategory.GPIO, "GPIO", "JBlanked", "1.6.3", FapPack.BLUE, needsModule = true))
+        add(packApp("emrtd", "eMRTD Reader", "Read your own e-passport/ID over NFC (PACE/BAC) — see what documents expose.", FapCategory.NFC, "NFC", "Filip Sedivy", "1.0", FapPack.BLUE))
     }
 
     val allApps: List<FapApp> get() = featuredApps
@@ -403,6 +433,7 @@ object FapHubCatalog {
         author: String,
         version: String,
         pack: FapPack,
+        needsModule: Boolean = false,
     ): FapApp = FapApp(
         id = alias,
         catalogAlias = alias,
@@ -414,7 +445,7 @@ object FapHubCatalog {
         downloadUrl = "https://catalog.flipperzero.one/api/v0/0/application?limit=500",
         installFolder = installFolder,
         pack = pack,
-        needsModule = false,
+        needsModule = needsModule,
         targetFirmware = "official release SDK",
     )
 }

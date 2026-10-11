@@ -515,7 +515,7 @@ private fun FapAppCard(app: FapApp, installStatus: InstallStatus?, onInstall: ()
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(app.pack.displayName, style = MaterialTheme.typography.labelSmall, color = VesperOrange)
                     Text("v${app.version}", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                    Text("Bare", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                    Text(if (app.needsModule) "Devboard" else "Bare", style = MaterialTheme.typography.labelSmall, color = if (app.needsModule) RiskHigh else Color.Gray)
                 }
             }
             Spacer(modifier = Modifier.width(8.dp))
@@ -551,7 +551,7 @@ private fun AppDetailSheet(app: FapApp, installStatus: InstallStatus?, onInstall
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(top = 8.dp)) {
                         Text(app.pack.displayName, style = MaterialTheme.typography.bodySmall, color = VesperOrange)
                         Text("v${app.version}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
-                        Text("Bare Flipper", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                        Text(if (app.needsModule) "Needs WiFi devboard" else "Bare Flipper", style = MaterialTheme.typography.bodySmall, color = if (app.needsModule) RiskHigh else Color.Gray)
                     }
                 }
             }

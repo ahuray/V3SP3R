@@ -13,7 +13,12 @@ class FapHubCatalogTest {
     @Test
     fun `bare pack uses catalog aliases and official install folders`() {
         assertTrue(FapHubCatalog.bareApps.size >= 30)
-        assertTrue(FapHubCatalog.featuredApps.all { !it.needsModule })
+        val barePacks = setOf(FapPack.DAILY, FapPack.RADIO, FapPack.EDGE, FapPack.PLAY)
+        assertTrue(FapHubCatalog.featuredApps.filter { it.pack in barePacks }.all { !it.needsModule })
+        assertTrue(
+            FapHubCatalog.featuredApps.filter { it.needsModule }
+                .all { it.pack == FapPack.RED || it.pack == FapPack.BLUE },
+        )
         assertEquals(FapHubCatalog.featuredApps.map { it.id }.distinct().size, FapHubCatalog.featuredApps.size)
 
         val quac = FapHubCatalog.searchApps("quac").single()
@@ -52,6 +57,61 @@ class FapHubCatalogTest {
         val ids = FapHubCatalog.featuredApps.map { it.id }
         listOf("wifi_marauder", "evil_portal", "ble_spam", "subghz_bruteforcer", "mousejacker", "sentry_safe", "gps")
             .forEach { blocked -> assertFalse(ids.contains(blocked)) }
+    }
+
+    @Test
+    fun `competition packs are complete and well-formed`() {
+        assertEquals(
+            setOf(
+                "sub_analyzer",
+                "subghz_raw_edit",
+                "subhound",
+                "t5577_writer",
+                "rfid_maker",
+                "wiegand_reader",
+                "esp32_wifi_marauder",
+                "esp_flasher",
+                "flipper_http",
+                "xremote",
+                "flipirfreq",
+                "signal_generator",
+                "uart_terminal",
+                "spi_mem_manager",
+                "logic_analyzer",
+                "usb_hid_autofire",
+                "bettermouse",
+            ),
+            FapHubCatalog.appsInPack(FapPack.RED).map { it.id }.toSet(),
+        )
+        assertEquals(
+            setOf("access_audit", "seader", "seos", "radio_scanner", "flip_wifi", "emrtd"),
+            FapHubCatalog.appsInPack(FapPack.BLUE).map { it.id }.toSet(),
+        )
+
+        val allowedFolders = setOf(
+            "Tools", "NFC", "RFID", "Sub-GHz", "Infrared", "GPIO", "USB", "Bluetooth", "Media", "Games",
+        )
+        val aliasPattern = Regex("^[a-z0-9_]+$")
+        (FapHubCatalog.appsInPack(FapPack.RED) + FapHubCatalog.appsInPack(FapPack.BLUE)).forEach { app ->
+            assertTrue(app.catalogAlias.isNotBlank() && aliasPattern.matches(app.catalogAlias))
+            assertTrue(app.installFolder in allowedFolders)
+            assertTrue(FapHubCatalog.installPath(app).endsWith(".fap"))
+        }
+
+        assertEquals(FapHubCatalog.featuredApps.map { it.id }.distinct().size, FapHubCatalog.featuredApps.size)
+        assertTrue(FapHubCatalog.searchApps("red team").containsAll(FapHubCatalog.appsInPack(FapPack.RED)))
+        assertTrue(FapHubCatalog.searchApps("blue team").containsAll(FapHubCatalog.appsInPack(FapPack.BLUE)))
+
+        val moduleApps = FapHubCatalog.featuredApps.filter { it.needsModule }
+        assertEquals(
+            setOf("esp32_wifi_marauder", "esp_flasher", "flipper_http"),
+            moduleApps.filter { it.pack == FapPack.RED }.map { it.id }.toSet(),
+        )
+        assertEquals(
+            setOf("flip_wifi"),
+            moduleApps.filter { it.pack == FapPack.BLUE }.map { it.id }.toSet(),
+        )
+        assertEquals(4, moduleApps.size)
     }
 }
 
