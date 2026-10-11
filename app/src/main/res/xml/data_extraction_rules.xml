@@ -2,10 +2,11 @@
 <data-extraction-rules>
     <cloud-backup>
         <include domain="sharedpref" path="."/>
-        <exclude domain="sharedpref" path="api_key_prefs.xml"/>
+        <!-- Encrypted API keys are keystore-bound and cannot be restored elsewhere. -->
+        <exclude domain="sharedpref" path="vesper_secure_prefs.xml"/>
     </cloud-backup>
     <device-transfer>
         <include domain="sharedpref" path="."/>
-        <exclude domain="sharedpref" path="api_key_prefs.xml"/>
+        <exclude domain="sharedpref" path="vesper_secure_prefs.xml"/>
     </device-transfer>
 </data-extraction-rules>

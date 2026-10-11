@@ -9,6 +9,7 @@ import kotlinx.serialization.json.Json
 import okhttp3.*
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -56,6 +57,11 @@ class GlassesBridgeClient @Inject constructor() {
     private var webSocket: WebSocket? = null
     private var bridgeUrl: String? = null
     private val isConnecting = AtomicBoolean(false)
+    // Incremented on every connection attempt. Each socket's listener captures
+    // its epoch and ignores callbacks once a newer attempt has superseded it,
+    // so a late onClosed/onFailure from a cancelled socket can't clobber the
+    // new connection's state or null out its reference.
+    private val connectionEpoch = AtomicInteger(0)
     private var reconnectAttempts = 0
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var reconnectJob: Job? = null
@@ -156,6 +162,7 @@ class GlassesBridgeClient @Inject constructor() {
             Log.w(TAG, "doConnect skipped — another connection attempt is already in progress")
             return
         }
+        val epoch = connectionEpoch.incrementAndGet()
         _state.value = BridgeState.Connecting(url)
         Log.i(TAG, "Connecting to glasses bridge: $url")
 
@@ -172,7 +179,15 @@ class GlassesBridgeClient @Inject constructor() {
         }
 
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
+            // True while this listener still owns the current connection attempt.
+            private fun isStale() = connectionEpoch.get() != epoch
+
             override fun onOpen(webSocket: WebSocket, response: Response) {
+                if (isStale()) {
+                    // Superseded by a newer connect() — abandon this socket.
+                    webSocket.cancel()
+                    return
+                }
                 isConnecting.set(false)
                 reconnectAttempts = 0
                 _state.value = BridgeState.Connected(url)
@@ -187,6 +202,7 @@ class GlassesBridgeClient @Inject constructor() {
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
+                if (isStale()) return
                 try {
                     Log.d(TAG, "Bridge raw: ${text.take(200)}")
                     val message = json.decodeFromString<GlassesMessage>(text)
@@ -203,6 +219,12 @@ class GlassesBridgeClient @Inject constructor() {
             }
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                // A late close from a superseded socket must not touch the new
+                // connection's reference or state.
+                if (isStale()) {
+                    Log.d(TAG, "Ignoring onClosed from stale socket (code=$code)")
+                    return
+                }
                 isConnecting.set(false)
                 this@GlassesBridgeClient.webSocket = null
                 Log.i(TAG, "Bridge connection closed (code=$code): $reason")
@@ -216,6 +238,10 @@ class GlassesBridgeClient @Inject constructor() {
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                if (isStale()) {
+                    Log.d(TAG, "Ignoring onFailure from stale socket: ${t.message}")
+                    return
+                }
                 isConnecting.set(false)
                 this@GlassesBridgeClient.webSocket = null
                 val reason = t.message ?: "unknown error"

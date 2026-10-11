@@ -6,10 +6,16 @@ import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import com.vesper.flipper.ai.LlmProvider
 import com.vesper.flipper.ai.LlmSelection
+import com.vesper.flipper.security.EncryptedStorage
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -17,10 +23,19 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
 
 @Singleton
 class SettingsStore @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val secureStorage: EncryptedStorage
 ) {
 
     private val PROVIDER = stringPreferencesKey("llm_provider")
+
+    // Bumped whenever an API key is written so [apiKey] re-emits; encrypted
+    // storage is not observable on its own.
+    private val secureKeyRevision = MutableStateFlow(0)
+
+    // Serializes API-key writes against legacy migration so migration cannot
+    // clobber a freshly saved key or resurrect a deleted one.
+    private val apiKeyMutex = Mutex()
 
     val selectedProvider: Flow<LlmProvider> = context.dataStore.data.map { preferences ->
         LlmProvider.fromId(preferences[PROVIDER])
@@ -33,25 +48,61 @@ class SettingsStore @Inject constructor(
     }
 
     /**
-     * API key for the active provider. The OpenRouter key stays in
-     * "openrouter_api_key" so existing installs keep working.
+     * API key for the active provider. Keys are held in encrypted storage
+     * (see [EncryptedStorage]); any plaintext key left by an older build is
+     * read transparently here and migrated on the next read or write.
      */
-    val apiKey: Flow<String?> = context.dataStore.data.map { preferences ->
-        val provider = LlmProvider.fromId(preferences[PROVIDER])
-        preferences[stringPreferencesKey(provider.apiKeyPreference)]?.takeIf { it.isNotBlank() }
+    val apiKey: Flow<String?> = combine(
+        context.dataStore.data,
+        secureKeyRevision
+    ) { preferences, _ ->
+        readApiKey(LlmProvider.fromId(preferences[PROVIDER]), preferences)
     }
 
-    suspend fun setApiKey(key: String) {
-        context.dataStore.edit { preferences ->
-            val provider = LlmProvider.fromId(preferences[PROVIDER])
-            val preference = stringPreferencesKey(provider.apiKeyPreference)
-            val trimmed = key.trim()
-            if (trimmed.isEmpty()) {
-                preferences.remove(preference)
-            } else {
-                preferences[preference] = trimmed
+    private fun readApiKey(provider: LlmProvider, preferences: Preferences): String? {
+        secureStorage.getString(provider.apiKeyPreference)?.takeIf { it.isNotBlank() }?.let { return it }
+        // Legacy fallback: keys written to plaintext DataStore before encryption.
+        return preferences[stringPreferencesKey(provider.apiKeyPreference)]?.takeIf { it.isNotBlank() }
+    }
+
+    suspend fun setApiKey(key: String) = apiKeyMutex.withLock {
+        val provider = LlmProvider.fromId(context.dataStore.data.first()[PROVIDER])
+        val trimmed = key.trim()
+        if (trimmed.isEmpty()) {
+            secureStorage.remove(provider.apiKeyPreference)
+        } else {
+            secureStorage.putString(provider.apiKeyPreference, trimmed)
+        }
+        // Drop any plaintext copy that an older build may have persisted.
+        context.dataStore.edit { it.remove(stringPreferencesKey(provider.apiKeyPreference)) }
+        secureKeyRevision.update { it + 1 }
+    }
+
+    /**
+     * Move any plaintext API keys left by older builds into encrypted storage,
+     * then purge them from the plaintext DataStore. Idempotent, and serialized
+     * with [setApiKey] so it never overwrites a key the user just saved.
+     */
+    private suspend fun migrateLegacyApiKeys() = apiKeyMutex.withLock {
+        val preferences = context.dataStore.data.first()
+        val plaintext = LlmProvider.entries.mapNotNull { provider ->
+            preferences[stringPreferencesKey(provider.apiKeyPreference)]
+                ?.takeIf { it.isNotBlank() }
+                ?.let { provider to it }
+        }
+        if (plaintext.isEmpty()) return@withLock
+        plaintext.forEach { (provider, key) ->
+            // Only seed encrypted storage when it has no key yet — never clobber
+            // a key written since migration started.
+            if (secureStorage.getString(provider.apiKeyPreference).isNullOrBlank()) {
+                secureStorage.putString(provider.apiKeyPreference, key)
             }
         }
+        // Purge the insecure plaintext residue regardless.
+        context.dataStore.edit { prefs ->
+            LlmProvider.entries.forEach { prefs.remove(stringPreferencesKey(it.apiKeyPreference)) }
+        }
+        secureKeyRevision.update { it + 1 }
     }
 
     val selectedModel: Flow<String> = context.dataStore.data.map { preferences ->
@@ -67,9 +118,10 @@ class SettingsStore @Inject constructor(
     }
 
     suspend fun readLlmSelection(): LlmSelection {
+        migrateLegacyApiKeys()
         val preferences = context.dataStore.data.first()
         val provider = LlmProvider.fromId(preferences[PROVIDER])
-        val apiKey = preferences[stringPreferencesKey(provider.apiKeyPreference)]?.takeIf { it.isNotBlank() }
+        val apiKey = readApiKey(provider, preferences)
         val model = preferences[stringPreferencesKey(provider.modelPreference)] ?: provider.defaultModel
         return LlmSelection(provider, apiKey, model)
     }

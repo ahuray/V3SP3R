@@ -124,11 +124,19 @@ class FlipperCatalogClient(
         val app = loadApplications().firstOrNull { it.alias.equals(needle, ignoreCase = true) }
             ?: throw IOException("Flipper catalog has no app named \"$needle\"")
 
-        val apis = FlipperCatalogJson.candidateApis(
-            firmware = firmwareVersion,
-            latestReleaseApi = loadLatestReleaseApi(),
-            currentApi = app.currentApi,
-        )
+        // When the connected firmware maps to a known SDK API, pin to exactly
+        // that build. Falling back to the latest/other APIs would install an ELF
+        // compiled for a different SDK, which can crash on the device.
+        val knownApi = FlipperCatalogJson.sdkApiForFirmware(firmwareVersion)
+        val apis = if (knownApi != null) {
+            listOf(knownApi)
+        } else {
+            FlipperCatalogJson.candidateApis(
+                firmware = firmwareVersion,
+                latestReleaseApi = loadLatestReleaseApi(),
+                currentApi = app.currentApi,
+            )
+        }
         var lastError: Exception? = null
         for (api in apis) {
             try {
@@ -149,6 +157,12 @@ class FlipperCatalogClient(
             } catch (error: Exception) {
                 lastError = error
             }
+        }
+        if (knownApi != null) {
+            throw IOException(
+                "No ${app.alias} build is available for your firmware's SDK (API $knownApi). " +
+                    "Update the app or firmware so their SDK APIs match. ${lastError?.message ?: ""}".trim()
+            )
         }
         throw IOException(
             "Could not download ${app.alias} for SDK ${apis.joinToString()}. ${lastError?.message ?: ""}".trim()

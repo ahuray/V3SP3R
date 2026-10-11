@@ -60,6 +60,13 @@ class PayloadEngine @Inject constructor(
                 )
             }
             val cleanScript = validated.getOrThrow()
+            if (!cleanScript.isValid) {
+                // Validation rejected the script; do not present it as ready to deploy.
+                return@withContext PayloadResult.Error(
+                    "Validation rejected the script: " +
+                        cleanScript.errors.joinToString("; ").ifBlank { "unknown error" }
+                )
+            }
             onProgress(PayloadProgress.Validated(cleanScript))
 
             // STEP 3: Ready for execution
@@ -153,10 +160,10 @@ class PayloadEngine @Inject constructor(
                 Result.success("COMMAND:${action.command}")
             }
             is PayloadAction.RunBadUsb -> {
-                // Save and trigger execution
+                // Save first; only return the run instruction if the write succeeded,
+                // otherwise the run would target a missing or stale script.
                 val path = "/ext/badusb/$filename.txt"
-                flipperFileSystem.writeFile(path, script)
-                Result.success("EXECUTE:badusb $path")
+                flipperFileSystem.writeFile(path, script).map { "EXECUTE:badusb $path" }
             }
         }
     }
@@ -192,6 +199,13 @@ class PayloadEngine @Inject constructor(
                 )
             }
             val cleanHtml = validated.getOrThrow()
+            if (!cleanHtml.isValid) {
+                // Validation rejected the portal; do not present it as ready to deploy.
+                return@withContext PayloadResult.Error(
+                    "Validation rejected the portal: " +
+                        cleanHtml.errors.joinToString("; ").ifBlank { "unknown error" }
+                )
+            }
             onProgress(PayloadProgress.Validated(cleanHtml))
 
             // STEP 3: Ready for execution

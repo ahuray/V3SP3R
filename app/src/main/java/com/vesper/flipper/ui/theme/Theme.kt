@@ -14,33 +14,39 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 // ═══════════════════════════════════════════════════════════
-// VESPER BRAND — Classy Mythic Cyberpunk Bond
+// VESPER BRAND — Terminal / Phosphor Hacker
 // ═══════════════════════════════════════════════════════════
+// Signature: phosphor-green glow on deep terminal black, CRT amber for
+// attention, muted cyan-steel panels. The historic Vesper* names are kept so
+// the whole app re-skins by repointing these values; comments note each role.
 
-// Primary: Wine Red — the blood of the machine
-val VesperWine = Color(0xFF8B2038)           // True wine / claret red
-val VesperWineLight = Color(0xFFAD3B50)      // Lighter wine for highlights
-val VesperWineDark = Color(0xFF5E1625)        // Darker wine for pressed states
+// Primary: Terminal Green — deep emerald fill, phosphor glow for accents.
+// Deep enough that white text/icons on it stay legible (~4.9:1), since the
+// accent is used as a fill behind white content across many screens.
+val VesperWine = Color(0xFF0E7D47)           // Deep emerald (primary fill)
+val VesperWineLight = Color(0xFF35E07A)      // Phosphor green for glow highlights
+val VesperWineDark = Color(0xFF084F2D)       // Darker green for pressed states
 
 // Legacy alias — keeps existing references working
 val VesperOrange = VesperWine
 val VesperOrangeDark = VesperWineDark
 
-// Secondary: Gunmetal — cold steel sophistication
-val VesperSecondary = Color(0xFF1A1F2E)       // Gunmetal blue-black
-val VesperGunmetal = Color(0xFF2A3142)         // Lighter gunmetal
+// Secondary: Cyan Steel — cold data accent
+val VesperSecondary = Color(0xFF0E1613)      // Near-black panel, green-tinted
+val VesperGunmetal = Color(0xFF18231E)       // Lifted panel
+val VesperCyan = Color(0xFF34E7E4)           // Data cyan for secondary accents
 
-// Accent: Champagne Gold — old money elegance
-val VesperAccent = Color(0xFFD4AF37)           // Champagne gold
-val VesperGold = Color(0xFFD4AF37)
-val VesperGoldMuted = Color(0xFF9E8530)        // Muted gold for secondary accents
+// Accent: CRT Amber — attention / warning glow
+val VesperAccent = Color(0xFFF4B740)         // CRT amber
+val VesperGold = Color(0xFFF4B740)
+val VesperGoldMuted = Color(0xFFB7891F)      // Muted amber for secondary accents
 
-// Surface Colors — deep noir palette
-val VesperSurface = Color(0xFF0E1118)
-val VesperSurfaceVariant = Color(0xFF161B28)
-val VesperBackground = Color(0xFF060810)
-val VesperBackgroundDeep = Color(0xFF030508)
-val VesperBackgroundGlow = Color(0xFF0D0A14)   // Very subtle wine tint
+// Surface Colors — deep terminal black
+val VesperSurface = Color(0xFF0A110E)
+val VesperSurfaceVariant = Color(0xFF101A15)
+val VesperBackground = Color(0xFF060A08)
+val VesperBackgroundDeep = Color(0xFF030605)
+val VesperBackgroundGlow = Color(0xFF07130D)   // Very subtle phosphor glow
 
 val VesperBackdropBrush = Brush.verticalGradient(
     colors = listOf(
@@ -51,105 +57,106 @@ val VesperBackdropBrush = Brush.verticalGradient(
     )
 )
 
-// Risk Colors — refined
-val RiskLow = Color(0xFF4CAF7D)
-val RiskMedium = Color(0xFFD4AF37)   // Gold for medium — on brand
-val RiskHigh = Color(0xFFCF4455)     // Wine-adjacent red
-val RiskBlocked = Color(0xFF6B7394)
+// Risk Colors — terminal-coded
+val RiskLow = Color(0xFF2DE37E)      // Phosphor green — clear
+val RiskMedium = Color(0xFFF4B740)   // Amber — caution
+val RiskHigh = Color(0xFFFF5C66)     // Alert red
+val RiskBlocked = Color(0xFF5E6E66)  // Muted green-gray
 
 // Diff Colors
-val DiffAdded = Color(0xFF3CBF88)
-val DiffRemoved = Color(0xFFCF4455)
-val DiffChanged = Color(0xFFD4AF37)
-val DiffAddedBackground = Color(0x403CBF88)
-val DiffRemovedBackground = Color(0x40CF4455)
+val DiffAdded = Color(0xFF2DE37E)
+val DiffRemoved = Color(0xFFFF5C66)
+val DiffChanged = Color(0xFFF4B740)
+val DiffAddedBackground = Color(0x332DE37E)
+val DiffRemovedBackground = Color(0x33FF5C66)
 
 // Chat Colors — distinct from system
-val ChatAssistant = Color(0xFF161B28)       // Dark gunmetal bubble
-val ChatUser = VesperWine                    // Wine bubble for user
-val ChatTool = Color(0xFF121620)             // Even darker for tool results
-val ChatToolAccent = VesperGold              // Gold for tool highlights
+val ChatAssistant = Color(0xFF101A15)       // Dark panel bubble
+val ChatUser = VesperWineDark                // Deep-green bubble for user
+val ChatTool = Color(0xFF0A120E)             // Even darker for tool results
+val ChatToolAccent = VesperGold              // Amber for tool highlights
 
 private val DarkColorScheme = darkColorScheme(
     primary = VesperWine,
-    onPrimary = Color(0xFFF5E6EC),
+    onPrimary = Color(0xFFEAF6EF),
     primaryContainer = VesperWineDark,
-    onPrimaryContainer = Color(0xFFF8E0EC),
-    secondary = VesperSecondary,
-    onSecondary = Color(0xFFCAD0E0),
+    onPrimaryContainer = Color(0xFFBFF4D7),
+    secondary = VesperCyan,
+    onSecondary = Color(0xFF04140B),
     secondaryContainer = VesperSurfaceVariant,
-    onSecondaryContainer = Color(0xFFD5DEF0),
+    onSecondaryContainer = Color(0xFFCDE9E6),
     tertiary = VesperGold,
-    onTertiary = Color(0xFF1A1508),
+    onTertiary = Color(0xFF1A1300),
     background = VesperBackground,
-    onBackground = Color(0xFFE6E8F0),
+    onBackground = Color(0xFFD7E4DD),
     surface = VesperSurface,
-    onSurface = Color(0xFFE4E6EE),
+    onSurface = Color(0xFFD7E4DD),
     surfaceVariant = VesperSurfaceVariant,
-    onSurfaceVariant = Color(0xFF8E96AE),
-    outline = Color(0xFF2E3548),
-    outlineVariant = Color(0xFF1E2536),
+    onSurfaceVariant = Color(0xFF7C8F86),
+    outline = Color(0xFF243029),
+    outlineVariant = Color(0xFF18211C),
     error = RiskHigh,
     onError = Color(0xFF200909)
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = VesperWine,
+    primary = VesperWineDark,
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFF5D6E4),
-    onPrimaryContainer = Color(0xFF4D1830),
-    secondary = VesperSecondary,
+    primaryContainer = Color(0xFFC6F3DB),
+    onPrimaryContainer = Color(0xFF04341F),
+    secondary = Color(0xFF0E7F7C),
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFDCE0F0),
-    onSecondaryContainer = Color(0xFF1A1F2E),
-    tertiary = VesperGold,
-    onTertiary = Color(0xFF1A1508),
-    background = Color(0xFFF4F2F5),
-    onBackground = Color(0xFF121520),
+    secondaryContainer = Color(0xFFC7EEEC),
+    onSecondaryContainer = Color(0xFF04312F),
+    tertiary = VesperGoldMuted,
+    onTertiary = Color.White,
+    background = Color(0xFFF1F5F2),
+    onBackground = Color(0xFF101713),
     surface = Color.White,
-    onSurface = Color(0xFF111420),
-    surfaceVariant = Color(0xFFEBE8EE),
-    onSurfaceVariant = Color(0xFF504862),
-    outline = Color(0xFF706680),
-    outlineVariant = Color(0xFFBEB4C8),
+    onSurface = Color(0xFF101713),
+    surfaceVariant = Color(0xFFE2EBE5),
+    onSurfaceVariant = Color(0xFF46524B),
+    outline = Color(0xFF6C786F),
+    outlineVariant = Color(0xFFBECABB),
     error = RiskHigh,
     onError = Color.White
 )
 
+// Sharp, boxy corners for a crisp terminal-panel feel.
 private val VesperShapes = Shapes(
-    extraSmall = RoundedCornerShape(4.dp),
-    small = RoundedCornerShape(8.dp),
-    medium = RoundedCornerShape(12.dp),
-    large = RoundedCornerShape(16.dp),
-    extraLarge = RoundedCornerShape(20.dp)
+    extraSmall = RoundedCornerShape(2.dp),
+    small = RoundedCornerShape(4.dp),
+    medium = RoundedCornerShape(6.dp),
+    large = RoundedCornerShape(10.dp),
+    extraLarge = RoundedCornerShape(14.dp)
 )
 
 private val BaseTypography = androidx.compose.material3.Typography()
 
 val VesperTypography = BaseTypography.copy(
     displayLarge = TextStyle(
-        fontFamily = FontFamily.Serif,
-        fontWeight = FontWeight.Light,
-        fontSize = 52.sp,
-        letterSpacing = 1.2.sp
+        fontFamily = FontFamily.Monospace,
+        fontWeight = FontWeight.Bold,
+        fontSize = 48.sp,
+        letterSpacing = 2.0.sp
     ),
     headlineLarge = TextStyle(
-        fontFamily = FontFamily.Serif,
-        fontWeight = FontWeight.Normal,
-        fontSize = 30.sp,
-        letterSpacing = 0.6.sp
+        fontFamily = FontFamily.Monospace,
+        fontWeight = FontWeight.Bold,
+        fontSize = 28.sp,
+        letterSpacing = 1.2.sp
     ),
     titleLarge = TextStyle(
-        fontFamily = FontFamily.Serif,
-        fontWeight = FontWeight.Normal,
-        fontSize = 21.sp,
-        letterSpacing = 0.3.sp
+        fontFamily = FontFamily.Monospace,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 20.sp,
+        letterSpacing = 0.8.sp
     ),
     titleMedium = TextStyle(
-        fontFamily = FontFamily.Serif,
-        fontWeight = FontWeight.Normal,
+        fontFamily = FontFamily.Monospace,
+        fontWeight = FontWeight.Medium,
         fontSize = 16.sp,
-        letterSpacing = 0.2.sp
+        letterSpacing = 0.5.sp
     ),
     bodyLarge = TextStyle(
         fontFamily = FontFamily.SansSerif,

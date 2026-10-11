@@ -182,7 +182,7 @@ class FlipperToolExecutor @Inject constructor(
      * Trigger Sub-GHz transmission
      */
     suspend fun transmitSubGhz(subFilePath: String): ToolResult {
-        return executeFlipperCommand("subghz tx $subFilePath")
+        return executeFlipperCommand("subghz tx_from_file $subFilePath")
     }
 
     /**

@@ -49,7 +49,11 @@ class VesperAgent @Inject constructor(
     private val settingsStore: SettingsStore
 ) {
 
-    private val _conversationState = MutableStateFlow(ConversationState())
+    // One id shared by the initial conversation state and command audit entries,
+    // so the first conversation and its audit log line up before startNewSession.
+    private var currentSessionId: String = UUID.randomUUID().toString()
+
+    private val _conversationState = MutableStateFlow(ConversationState(sessionId = currentSessionId))
     val conversationState: StateFlow<ConversationState> = _conversationState.asStateFlow()
 
     // Photo capture via smart glasses — set by GlassesIntegration when connected
@@ -66,8 +70,6 @@ class VesperAgent @Inject constructor(
         ignoreUnknownKeys = true
         encodeDefaults = true
     }
-
-    private var currentSessionId: String = UUID.randomUUID().toString()
 
     init {
         persistenceScope.launch {
@@ -202,20 +204,24 @@ class VesperAgent @Inject constructor(
      */
     suspend fun continueAfterApproval(approvalId: String, approved: Boolean): ConversationState {
         val stateBeforeDecision = _conversationState.value
-        val effectiveApprovalId = stateBeforeDecision.pendingApproval?.id ?: approvalId
+        val pending = stateBeforeDecision.pendingApproval
+        if (pending == null || pending.id != approvalId) {
+            // Stale or mismatched decision: do not redirect it onto a different
+            // command that may have replaced the original approval dialog.
+            return stateBeforeDecision
+        }
+        val effectiveApprovalId = approvalId
 
         // Hide approval UI immediately to avoid duplicate taps while command execution is in progress.
-        if (stateBeforeDecision.pendingApproval?.id == effectiveApprovalId) {
-            _conversationState.value = stateBeforeDecision.copy(
-                isLoading = true,
-                pendingApproval = null,
-                progress = AgentProgress(
-                    stage = AgentProgressStage.TOOL_EXECUTING,
-                    detail = if (approved) "Applying approved action..." else "Rejecting action..."
-                ),
-                error = null
-            )
-        }
+        _conversationState.value = stateBeforeDecision.copy(
+            isLoading = true,
+            pendingApproval = null,
+            progress = AgentProgress(
+                stage = AgentProgressStage.TOOL_EXECUTING,
+                detail = if (approved) "Applying approved action..." else "Rejecting action..."
+            ),
+            error = null
+        )
 
         val result = if (approved) {
             commandExecutor.approve(effectiveApprovalId, currentSessionId)
@@ -639,6 +645,11 @@ class VesperAgent @Inject constructor(
     }
 
     private suspend fun restorePersistedConversation() {
+        // Capture the state we are about to restore over. If the user starts a
+        // new session or sends a message while this async restore is running,
+        // the state reference changes and we must not overwrite their work.
+        val stateAtStart = _conversationState.value
+
         val savedSessionId = settingsStore.lastChatSessionId.first()
             ?.takeIf { it.isNotBlank() }
             ?: return
@@ -653,6 +664,12 @@ class VesperAgent @Inject constructor(
             entity.toDomainMessageOrNull()
         }
         if (restoredMessages.isEmpty()) return
+
+        val current = _conversationState.value
+        if (current !== stateAtStart || current.messages.isNotEmpty()) {
+            // A newer conversation is already active; leave it untouched.
+            return
+        }
 
         currentSessionId = savedSessionId
         _conversationState.value = ConversationState(
@@ -680,10 +697,12 @@ class VesperAgent @Inject constructor(
     private suspend fun persistConversationSnapshot(snapshot: PersistedConversationSnapshot) {
         persistenceMutex.withLock {
             settingsStore.setLastChatSessionId(snapshot.sessionId)
-            chatDao.deleteSession(snapshot.sessionId)
-            snapshot.messages.forEach { message ->
-                chatDao.insert(message.toEntity(snapshot.sessionId))
-            }
+            // Delete + insert in one transaction so a failure cannot leave the
+            // saved conversation empty or incomplete.
+            chatDao.replaceSession(
+                sessionId = snapshot.sessionId,
+                messages = snapshot.messages.map { it.toEntity(snapshot.sessionId) }
+            )
         }
     }
 

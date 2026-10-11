@@ -10,6 +10,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -284,7 +285,7 @@ class OpenRouterPromptVariantBenchmarkLiveTest {
             val choices = root["choices"]?.jsonArray ?: throw IllegalStateException("No choices in response")
             val first = choices.firstOrNull()?.jsonObject ?: throw IllegalStateException("Empty choices array")
             val message = first["message"]?.jsonObject ?: throw IllegalStateException("No message in choice")
-            val content = message["content"]?.toString()?.trim('"').orEmpty()
+            val content = message["content"]?.jsonPrimitive?.content.orEmpty()
             if (content.isBlank()) {
                 throw IllegalStateException("Model returned empty content")
             }

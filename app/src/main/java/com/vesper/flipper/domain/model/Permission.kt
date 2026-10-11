@@ -34,12 +34,19 @@ data class Permission(
     }
 
     private fun matchesPath(path: String): Boolean {
-        // Support glob-style patterns
-        val regex = pathPattern
-            .replace(".", "\\.")
-            .replace("*", ".*")
-            .replace("?", ".")
-            .toRegex()
+        // Build the regex from a fully-escaped pattern so only the intentional
+        // `*` and `?` wildcards are treated as glob operators. Any other regex
+        // metacharacter in a granted path (e.g. "/ext/project[1]") is matched
+        // literally and cannot widen the grant to a different file.
+        val regex = buildString {
+            for (ch in pathPattern) {
+                when (ch) {
+                    '*' -> append(".*")
+                    '?' -> append('.')
+                    else -> append(Regex.escape(ch.toString()))
+                }
+            }
+        }.toRegex()
         return regex.matches(path)
     }
 

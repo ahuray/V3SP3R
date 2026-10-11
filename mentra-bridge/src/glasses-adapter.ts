@@ -266,7 +266,11 @@ export class GenericGlassesAdapter extends GlassesAdapter {
   onBridgeMessage(message: GlassesMessage) {
     if (
       this.glassesWs?.readyState === WebSocket.OPEN &&
-      (message.type === "AI_RESPONSE" || message.type === "STATUS_UPDATE")
+      (message.type === "AI_RESPONSE" ||
+        message.type === "STATUS_UPDATE" ||
+        // Forward capture requests so generic glasses can take the photo the
+        // agent asked for (otherwise vision requests silently never fire).
+        message.type === "CAPTURE_REQUEST")
     ) {
       this.glassesWs.send(JSON.stringify(message));
     }

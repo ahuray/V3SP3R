@@ -11,7 +11,8 @@ import java.io.*
 import java.net.ServerSocket
 import java.net.Socket
 import java.net.URLDecoder
-import java.text.SimpleDateFormat
+import java.security.MessageDigest
+import java.security.SecureRandom
 import java.util.*
 
 /**
@@ -45,14 +46,21 @@ class WebFileServer(
     private val _connectionCount = MutableStateFlow(0)
     val connectionCount: StateFlow<Int> = _connectionCount.asStateFlow()
 
+    // Per-run secret. Every request must present this token (query param on the
+    // first load, cookie thereafter); otherwise anyone on the LAN who can reach
+    // the port could read, upload, and delete Flipper files.
+    @Volatile
+    private var accessToken: String = ""
+
     fun start() {
         if (_isRunning.value) return
 
         serverJob = scope.launch {
             try {
+                accessToken = generateAccessToken()
                 serverSocket = ServerSocket(port)
                 _isRunning.value = true
-                _serverUrl.value = "http://${getLocalIpAddress()}:$port"
+                _serverUrl.value = "http://${getLocalIpAddress()}:$port/?token=$accessToken"
 
                 while (isActive) {
                     val socket = serverSocket?.accept() ?: break
@@ -75,8 +83,37 @@ class WebFileServer(
         serverJob?.cancel()
         serverSocket?.close()
         serverSocket = null
+        accessToken = ""
         _isRunning.value = false
         _serverUrl.value = null
+    }
+
+    private fun generateAccessToken(): String {
+        val bytes = ByteArray(24)
+        SecureRandom().nextBytes(bytes)
+        return bytes.joinToString("") { "%02x".format(it) }
+    }
+
+    /** Constant-time check that the request carries the current access token. */
+    private fun isAuthorized(path: String, headers: Map<String, String>): Boolean {
+        val token = accessToken
+        if (token.isEmpty()) return false
+        val presented = extractQueryParam(path, "token")
+            ?: extractCookie(headers, "vesper_token")
+            ?: return false
+        val a = presented.toByteArray(Charsets.UTF_8)
+        val b = token.toByteArray(Charsets.UTF_8)
+        return MessageDigest.isEqual(a, b)
+    }
+
+    private fun extractCookie(headers: Map<String, String>, name: String): String? {
+        val cookieHeader = headers.entries.firstOrNull { it.key.equals("Cookie", ignoreCase = true) }?.value
+            ?: return null
+        return cookieHeader.split(';')
+            .map { it.trim() }
+            .firstOrNull { it.startsWith("$name=") }
+            ?.substringAfter('=')
+            ?.takeIf { it.isNotEmpty() }
     }
 
     private fun getLocalIpAddress(): String {
@@ -120,17 +157,27 @@ class WebFileServer(
                     }
                 }
 
-                // Route request
+                // Reject anything that does not present the access token before
+                // reaching a route that can touch the Flipper filesystem.
+                if (!isAuthorized(path, headers)) {
+                    serveUnauthorized(writer)
+                    return
+                }
+
+                // Route on the path only; the query string (e.g. "?token=...") is kept
+                // on `path` for authorization and API argument parsing, but must not
+                // defeat exact-match routes like "/" or "/style.css".
+                val routePath = path.substringBefore('?')
                 when {
-                    path == "/" || path == "/index.html" -> serveIndexPage(writer)
-                    path.startsWith("/api/list") -> handleListApi(path, writer)
-                    path.startsWith("/api/read") -> handleReadApi(path, writer)
-                    path.startsWith("/api/download") -> handleDownloadApi(path, outputStream)
-                    path.startsWith("/api/delete") && method == "POST" -> handleDeleteApi(path, writer)
-                    path.startsWith("/api/mkdir") && method == "POST" -> handleMkdirApi(path, writer)
-                    path.startsWith("/api/upload") && method == "POST" ->
+                    routePath == "/" || routePath == "/index.html" -> serveIndexPage(writer)
+                    routePath.startsWith("/api/list") -> handleListApi(path, writer)
+                    routePath.startsWith("/api/read") -> handleReadApi(path, writer)
+                    routePath.startsWith("/api/download") -> handleDownloadApi(path, outputStream)
+                    routePath.startsWith("/api/delete") && method == "POST" -> handleDeleteApi(path, writer)
+                    routePath.startsWith("/api/mkdir") && method == "POST" -> handleMkdirApi(path, writer)
+                    routePath.startsWith("/api/upload") && method == "POST" ->
                         handleUploadApi(path, headers, inputStream, writer)
-                    path == "/style.css" -> serveCss(writer)
+                    routePath == "/style.css" -> serveCss(writer)
                     else -> serve404(writer)
                 }
             }
@@ -350,7 +397,9 @@ class WebFileServer(
             formData.append('file', file);
 
             try {
-                const res = await fetch('/api/upload?path=' + encodeURIComponent(currentPath + '/' + file.name), {
+                // Send the target directory only; the server appends the
+                // sanitized multipart filename itself.
+                const res = await fetch('/api/upload?path=' + encodeURIComponent(currentPath), {
                     method: 'POST',
                     body: formData
                 });
@@ -379,7 +428,9 @@ class WebFileServer(
 </html>
         """.trimIndent()
 
-        sendHtmlResponse(writer, html)
+        // Pin the token to this browser so later API/static requests authorize
+        // via the cookie instead of carrying it in every URL.
+        sendHtmlResponse(writer, html, setCookie = "vesper_token=$accessToken; Path=/; HttpOnly; SameSite=Strict")
     }
 
     private fun serveCss(writer: PrintWriter) {
@@ -416,8 +467,8 @@ main { padding: 16px; }
         """.trimIndent()
 
         writer.println("HTTP/1.1 200 OK")
-        writer.println("Content-Type: text/css")
-        writer.println("Content-Length: ${css.length}")
+        writer.println("Content-Type: text/css; charset=utf-8")
+        writer.println("Content-Length: ${css.toByteArray(Charsets.UTF_8).size}")
         writer.println()
         writer.print(css)
         writer.flush()
@@ -475,10 +526,10 @@ main { padding: 16px; }
         val filename = flipperPath.substringAfterLast("/")
 
         try {
-            val result = flipperFileSystem.readFile(flipperPath)
+            // Read raw bytes; decoding to String and back corrupts binaries (.fap, images).
+            val result = flipperFileSystem.readFileBytes(flipperPath)
             if (result.isSuccess) {
-                val content = result.getOrNull() ?: ""
-                val bytes = content.toByteArray()
+                val bytes = result.getOrNull() ?: ByteArray(0)
 
                 val response = """
                     HTTP/1.1 200 OK
@@ -703,26 +754,39 @@ main { padding: 16px; }
     private fun serve404(writer: PrintWriter) {
         val html = "<html><body><h1>404 Not Found</h1></body></html>"
         writer.println("HTTP/1.1 404 Not Found")
-        writer.println("Content-Type: text/html")
-        writer.println("Content-Length: ${html.length}")
+        writer.println("Content-Type: text/html; charset=utf-8")
+        writer.println("Content-Length: ${html.toByteArray(Charsets.UTF_8).size}")
         writer.println()
         writer.print(html)
         writer.flush()
     }
 
-    private fun sendHtmlResponse(writer: PrintWriter, html: String) {
+    private fun serveUnauthorized(writer: PrintWriter) {
+        val html = "<html><body><h1>401 Unauthorized</h1><p>Open this page from the link shown in Vesper.</p></body></html>"
+        writer.println("HTTP/1.1 401 Unauthorized")
+        writer.println("Content-Type: text/html; charset=utf-8")
+        writer.println("Content-Length: ${html.toByteArray(Charsets.UTF_8).size}")
+        writer.println()
+        writer.print(html)
+        writer.flush()
+    }
+
+    private fun sendHtmlResponse(writer: PrintWriter, html: String, setCookie: String? = null) {
         writer.println("HTTP/1.1 200 OK")
         writer.println("Content-Type: text/html; charset=utf-8")
-        writer.println("Content-Length: ${html.toByteArray().size}")
+        if (setCookie != null) writer.println("Set-Cookie: $setCookie")
+        writer.println("Content-Length: ${html.toByteArray(Charsets.UTF_8).size}")
         writer.println()
         writer.print(html)
         writer.flush()
     }
 
     private fun sendJsonResponse(writer: PrintWriter, json: String) {
+        // Content-Length must count encoded UTF-8 bytes, not characters, or a
+        // non-ASCII filename/content makes clients truncate the JSON body.
         writer.println("HTTP/1.1 200 OK")
-        writer.println("Content-Type: application/json")
-        writer.println("Content-Length: ${json.length}")
+        writer.println("Content-Type: application/json; charset=utf-8")
+        writer.println("Content-Length: ${json.toByteArray(Charsets.UTF_8).size}")
         writer.println()
         writer.print(json)
         writer.flush()

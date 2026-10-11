@@ -1,11 +1,10 @@
 package com.vesper.flipper.security
 
 import android.content.Context
-import android.security.keystore.KeyGenParameterSpec
-import android.security.keystore.KeyProperties
+import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
-import java.io.File
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -158,20 +157,42 @@ class SecurityUtils @Inject constructor() {
 
 /**
  * Encrypted storage for sensitive data like API keys.
+ *
+ * Backed by [EncryptedSharedPreferences] (file `vesper_secure_prefs`). The
+ * backing file is excluded from backup and device transfer because its
+ * ciphertext is bound to this device's keystore and cannot be restored
+ * elsewhere.
  */
-class EncryptedStorage(context: Context) {
+@Singleton
+class EncryptedStorage @Inject constructor(
+    @ApplicationContext private val context: Context
+) {
+    // Lazily built so a keystore fault never crashes the app at injection time.
+    private val encryptedPrefs: SharedPreferences by lazy { createEncryptedPrefs() }
 
-    private val masterKey = MasterKey.Builder(context)
-        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-        .build()
+    private fun createEncryptedPrefs(): SharedPreferences {
+        return try {
+            build()
+        } catch (_: Exception) {
+            // A corrupt key (e.g. after an OS restore) makes the file undecryptable.
+            // Reset the store once so the app can continue with fresh encrypted prefs.
+            context.deleteSharedPreferences(PREFS_FILE_NAME)
+            build()
+        }
+    }
 
-    private val encryptedPrefs = EncryptedSharedPreferences.create(
-        context,
-        "vesper_secure_prefs",
-        masterKey,
-        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-    )
+    private fun build(): SharedPreferences {
+        val masterKey = MasterKey.Builder(context)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build()
+        return EncryptedSharedPreferences.create(
+            context,
+            PREFS_FILE_NAME,
+            masterKey,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+    }
 
     fun putString(key: String, value: String) {
         encryptedPrefs.edit().putString(key, value).apply()
@@ -187,6 +208,10 @@ class EncryptedStorage(context: Context) {
 
     fun clear() {
         encryptedPrefs.edit().clear().apply()
+    }
+
+    private companion object {
+        const val PREFS_FILE_NAME = "vesper_secure_prefs"
     }
 }
 

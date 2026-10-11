@@ -37,6 +37,19 @@ class FlipperProtocol @Inject constructor() {
     @Volatile
     private var pendingRequest: PendingRequest? = null
     private val writeQueue = Channel<ByteArray>(Channel.UNLIMITED)
+    // Incoming transport chunks are serialized through one consumer so split
+    // protobuf frames are appended to the buffer in arrival order. Each chunk
+    // carries the connection epoch captured at enqueue time; a reset bumps the
+    // epoch and is delivered through the same channel, so chunks from a previous
+    // connection are dropped and the buffer is cleared on the consumer thread
+    // rather than racing in-flight parsing.
+    private val connectionEpoch = AtomicInteger(0)
+    private val incomingData = Channel<IncomingEvent>(Channel.UNLIMITED)
+
+    private sealed interface IncomingEvent {
+        data class Chunk(val epoch: Int, val data: ByteArray) : IncomingEvent
+        object Reset : IncomingEvent
+    }
     private val isWriting = AtomicBoolean(false)
     private val commandMutex = Mutex()
     @Volatile
@@ -73,6 +86,27 @@ class FlipperProtocol @Inject constructor() {
         scope.launch {
             processWriteQueue()
         }
+        scope.launch {
+            for (event in incomingData) {
+                when (event) {
+                    is IncomingEvent.Reset -> handleResetEvent()
+                    is IncomingEvent.Chunk -> {
+                        // Drop chunks enqueued before the most recent reset so a
+                        // previous connection's bytes cannot corrupt new frames.
+                        if (event.epoch == connectionEpoch.get()) {
+                            processIncomingChunk(event.data)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /** Clear transport buffers on the consumer thread (serialized with chunks). */
+    private fun handleResetEvent() {
+        responseBuffer.reset()
+        rawCliCollector = null
+        rawBinaryCollector = null
     }
 
     fun setBleService(service: FlipperBleService) {
@@ -80,7 +114,11 @@ class FlipperProtocol @Inject constructor() {
     }
 
     fun onConnectionReset() {
-        responseBuffer.reset()
+        // Invalidate chunks still queued from the previous connection and clear
+        // the frame buffer on the consumer thread (via the Reset event) so the
+        // reset cannot interleave with in-flight chunk parsing.
+        connectionEpoch.incrementAndGet()
+        incomingData.trySend(IncomingEvent.Reset)
         rawCliCollector = null
         firmwareProfile = FirmwareProfile.UNKNOWN
         lastCliProbeAtMs = 0L
@@ -128,23 +166,28 @@ class FlipperProtocol @Inject constructor() {
     }
 
     fun processIncomingData(data: ByteArray) {
-        scope.launch {
-            try {
-                val collector = rawCliCollector
-                if (collector != null) {
-                    collector.append(data)
-                    return@launch
-                }
-                val binaryCollector = rawBinaryCollector
-                if (binaryCollector != null) {
-                    binaryCollector.append(data)
-                    return@launch
-                }
-                responseBuffer.write(data)
-                parseResponses()
-            } catch (e: Exception) {
-                _responseFlow.emit(ProtocolResponse.Error("Parse error: ${e.message}"))
+        // Hand off to the single ordered consumer; never parse on the caller's
+        // thread or a fresh coroutine, which would reorder appends. The chunk is
+        // stamped with the current epoch so a later reset can discard it.
+        incomingData.trySend(IncomingEvent.Chunk(connectionEpoch.get(), data))
+    }
+
+    private suspend fun processIncomingChunk(data: ByteArray) {
+        try {
+            val collector = rawCliCollector
+            if (collector != null) {
+                collector.append(data)
+                return
             }
+            val binaryCollector = rawBinaryCollector
+            if (binaryCollector != null) {
+                binaryCollector.append(data)
+                return
+            }
+            responseBuffer.write(data)
+            parseResponses()
+        } catch (e: Exception) {
+            _responseFlow.emit(ProtocolResponse.Error("Parse error: ${e.message}"))
         }
     }
 
@@ -1222,18 +1265,25 @@ class FlipperProtocol @Inject constructor() {
         onTimeout: () -> T,
         block: suspend () -> T
     ): T {
-        val result = withTimeoutOrNull(timeoutMs) {
-            commandMutex.withLock {
-                block()
-            }
+        // Bound only the wait to acquire the mutex, not the operation itself.
+        // Enclosing block() in withTimeoutOrNull would cancel a legitimately
+        // long transfer (e.g. a 120s chunked write) after the lock-wait budget.
+        // tryLock is non-suspending, so there is no cancel-after-acquire race
+        // that could leave the mutex permanently held.
+        val deadline = System.currentTimeMillis() + timeoutMs
+        var acquired = commandMutex.tryLock()
+        while (!acquired && System.currentTimeMillis() < deadline) {
+            delay(COMMAND_MUTEX_POLL_INTERVAL_MS)
+            acquired = commandMutex.tryLock()
         }
-        if (result != null) {
-            return result
+        if (!acquired) {
+            return onTimeout()
         }
-        if (operation.isNotBlank()) {
-            // Keep operation name in scope for easier timeout diagnostics.
+        return try {
+            block()
+        } finally {
+            commandMutex.unlock()
         }
-        return onTimeout()
     }
 
     private fun isRawCollectorActive(): Boolean {
@@ -1292,6 +1342,7 @@ class FlipperProtocol @Inject constructor() {
         private const val CLI_TEXT_PRINTABLE_RATIO_MIN = 0.70
         private const val CLI_PROBE_CACHE_MS = 10_000L
         private const val COMMAND_MUTEX_LOCK_TIMEOUT_MS = 15_000L
+        private const val COMMAND_MUTEX_POLL_INTERVAL_MS = 10L
         private const val COMMAND_MUTEX_LOCK_RPC_APP_TIMEOUT_MS = 30_000L
         private const val RPC_RESET_RETRY_DELAY_MS = 250L
         private const val RPC_SESSION_START_DELAY_MS = 250L
@@ -3313,14 +3364,30 @@ class FlipperProtocol @Inject constructor() {
         commandId: Int,
         timeoutMs: Long
     ): List<Flipper.Main> {
+        val deadlineMs = System.currentTimeMillis() + timeoutMs
         val responseBytes = collectRawBinaryResponseAttempt(request, timeoutMs)
         if (responseBytes.isEmpty()) return emptyList()
-        val collected = findRpcMainMessages(responseBytes, commandId).toMutableList()
+
+        // A quiet interval can end a read with only the first part of a split
+        // frame. Keep accumulating and re-parsing until a complete frame appears
+        // or the deadline passes, rather than discarding the partial bytes.
+        val accumulated = ByteArrayOutputStream()
+        accumulated.write(responseBytes)
+        var collected = findRpcMainMessages(accumulated.toByteArray(), commandId).toMutableList()
+        while (collected.isEmpty()) {
+            val remainingMs = deadlineMs - System.currentTimeMillis()
+            if (remainingMs <= 0L) break
+            val tail = collectRawBinaryTailResponse(
+                timeoutMs = remainingMs.coerceAtMost(RPC_CONTINUATION_COLLECT_WINDOW_MS)
+            )
+            if (tail.isEmpty()) break
+            accumulated.write(tail)
+            collected = findRpcMainMessages(accumulated.toByteArray(), commandId).toMutableList()
+        }
         if (collected.isEmpty()) {
             return emptyList()
         }
 
-        val deadlineMs = System.currentTimeMillis() + timeoutMs
         while (collected.lastOrNull()?.hasNext == true) {
             val remainingMs = deadlineMs - System.currentTimeMillis()
             if (remainingMs <= 0L) break

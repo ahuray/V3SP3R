@@ -345,7 +345,7 @@ class ChimeraLabViewModel @Inject constructor(
                     )
                 }
 
-                val result = service.sendCommandWithOutput("subghz tx $tempPath")
+                val result = service.sendCommandWithOutput("subghz tx_from_file $tempPath")
                 if (result.isFailure) {
                     throw IllegalStateException(
                         "Failed to start Sub-GHz transmission on Flipper: " +
@@ -402,24 +402,34 @@ class ChimeraLabViewModel @Inject constructor(
     }
 
     private fun extractGenes(signal: SignalSource): List<SignalGene> {
-        if (signal.timings.isEmpty()) return emptyList()
+        val timings = signal.timings
+        if (timings.isEmpty()) return emptyList()
 
-        // Keep extraction deterministic and simple: split into up to 4 contiguous segments.
-        val chunkSize = (signal.timings.size / 4).coerceAtLeast(1)
+        // Split into up to 4 contiguous segments covering every timing. The
+        // remainder is spread across the leading segments so none is dropped
+        // (e.g. a 5-timing capture keeps all five).
         val types = listOf(GeneType.PREAMBLE, GeneType.ADDRESS, GeneType.COMMAND, GeneType.PAYLOAD)
+        val partCount = minOf(4, timings.size)
+        val base = timings.size / partCount
+        val remainder = timings.size % partCount
 
-        return signal.timings
-            .chunked(chunkSize)
-            .take(4)
-            .mapIndexed { index, chunk ->
+        val genes = mutableListOf<SignalGene>()
+        var start = 0
+        for (index in 0 until partCount) {
+            val size = base + if (index < remainder) 1 else 0
+            val chunk = timings.subList(start, start + size).toList()
+            genes.add(
                 SignalGene(
                     name = "${signal.name} Part ${index + 1}",
                     sourceSignal = signal.name,
                     sourceType = types.getOrElse(index) { GeneType.CUSTOM },
                     timingData = chunk,
-                    startOffset = index * chunkSize
+                    startOffset = start
                 )
-            }
+            )
+            start += size
+        }
+        return genes
     }
 
     private fun generateWaveformPreview(timings: List<Int>): List<Float> {

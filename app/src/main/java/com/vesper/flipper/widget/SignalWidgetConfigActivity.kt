@@ -21,11 +21,15 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.vesper.flipper.ble.FlipperFileSystem
 import com.vesper.flipper.ui.theme.VesperTheme
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class SignalWidgetConfigActivity : ComponentActivity() {
+
+    @Inject lateinit var fileSystem: FlipperFileSystem
 
     private var appWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID
 
@@ -49,6 +53,7 @@ class SignalWidgetConfigActivity : ComponentActivity() {
         setContent {
             VesperTheme(darkTheme = true) {
                 WidgetConfigScreen(
+                    loadSignals = { loadAvailableSignals() },
                     onSave = { signals ->
                         saveWidgetConfiguration(signals)
                         finishWithResult()
@@ -56,6 +61,40 @@ class SignalWidgetConfigActivity : ComponentActivity() {
                     onCancel = { finish() }
                 )
             }
+        }
+    }
+
+    /**
+     * Loads the real captures stored on the connected Flipper, grouped by
+     * signal family. Returns only families that actually have captures so the
+     * picker never advertises signals that cannot be triggered.
+     */
+    private suspend fun loadAvailableSignals(): List<SignalGroup> {
+        data class SignalSource(
+            val label: String,
+            val type: String,
+            val dir: String,
+            val ext: String
+        )
+
+        val sources = listOf(
+            SignalSource("Sub-GHz", "subghz", "/ext/subghz", ".sub"),
+            SignalSource("Infrared", "ir", "/ext/infrared", ".ir"),
+            SignalSource("NFC", "nfc", "/ext/nfc", ".nfc"),
+            SignalSource("RFID", "rfid", "/ext/lfrfid", ".rfid")
+        )
+
+        return sources.mapNotNull { source ->
+            val files = fileSystem.listDirectory(source.dir).getOrNull().orEmpty()
+                .filter { !it.isDirectory && it.name.endsWith(source.ext, ignoreCase = true) }
+                .map { file ->
+                    WidgetSignal(
+                        id = file.path,
+                        name = file.name.substringBeforeLast('.'),
+                        type = source.type
+                    )
+                }
+            if (files.isEmpty()) null else SignalGroup(source.label, source.type, files)
         }
     }
 
@@ -92,38 +131,18 @@ class SignalWidgetConfigActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WidgetConfigScreen(
+    loadSignals: suspend () -> List<SignalGroup>,
     onSave: (List<WidgetSignal?>) -> Unit,
     onCancel: () -> Unit
 ) {
     var selectedSignals by remember { mutableStateOf(listOf<WidgetSignal?>(null, null, null, null)) }
     var selectedSlot by remember { mutableStateOf<Int?>(null) }
 
-    // Mock signal data - in real implementation, this would come from the Flipper
-    val availableSignals = remember {
-        listOf(
-            SignalGroup("Sub-GHz", "subghz", listOf(
-                WidgetSignal("garage_door", "🚗 Garage Door", "subghz"),
-                WidgetSignal("gate_open", "🚪 Gate Open", "subghz"),
-                WidgetSignal("car_unlock", "🔓 Car Unlock", "subghz"),
-                WidgetSignal("fan_toggle", "🌀 Fan Toggle", "subghz")
-            )),
-            SignalGroup("Infrared", "ir", listOf(
-                WidgetSignal("tv_power", "📺 TV Power", "ir"),
-                WidgetSignal("ac_toggle", "❄️ AC Toggle", "ir"),
-                WidgetSignal("projector", "🎥 Projector", "ir"),
-                WidgetSignal("soundbar", "🔊 Soundbar", "ir")
-            )),
-            SignalGroup("NFC", "nfc", listOf(
-                WidgetSignal("work_badge", "🏢 Work Badge", "nfc"),
-                WidgetSignal("gym_card", "💪 Gym Card", "nfc"),
-                WidgetSignal("parking", "🅿️ Parking", "nfc")
-            )),
-            SignalGroup("RFID", "rfid", listOf(
-                WidgetSignal("home_key", "🏠 Home Key", "rfid"),
-                WidgetSignal("storage", "📦 Storage", "rfid")
-            ))
-        )
+    // Real captures from the connected Flipper; null while loading.
+    val signalsState = produceState<List<SignalGroup>?>(initialValue = null) {
+        value = runCatching { loadSignals() }.getOrDefault(emptyList())
     }
+    val availableSignals = signalsState.value
 
     Box(
         modifier = Modifier
@@ -208,33 +227,76 @@ fun WidgetConfigScreen(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                 )
 
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    availableSignals.forEach { group ->
-                        item {
-                            Text(
-                                text = group.name,
-                                style = MaterialTheme.typography.labelLarge,
-                                color = Color(0xFFFF6B00),
-                                modifier = Modifier.padding(vertical = 8.dp)
-                            )
+                when {
+                    availableSignals == null -> {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(color = Color(0xFFFF6B00))
                         }
-                        items(group.signals) { signal ->
-                            SignalItem(
-                                signal = signal,
-                                isSelected = selectedSignals.contains(signal),
-                                onClick = {
-                                    selectedSlot?.let { slot ->
-                                        selectedSignals = selectedSignals.toMutableList().apply {
-                                            set(slot, signal)
-                                        }
-                                        selectedSlot = null
-                                    }
+                    }
+                    availableSignals.isEmpty() -> {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.padding(32.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Warning,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(64.dp),
+                                    tint = Color(0xFF444444)
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = "No captured signals found",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = Color.White
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Connect your Flipper and capture Sub-GHz, IR, NFC, or RFID signals first.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color.Gray,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                )
+                            }
+                        }
+                    }
+                    else -> {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            availableSignals.forEach { group ->
+                                item {
+                                    Text(
+                                        text = group.name,
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = Color(0xFFFF6B00),
+                                        modifier = Modifier.padding(vertical = 8.dp)
+                                    )
                                 }
-                            )
+                                items(group.signals) { signal ->
+                                    SignalItem(
+                                        signal = signal,
+                                        isSelected = selectedSignals.contains(signal),
+                                        onClick = {
+                                            selectedSlot?.let { slot ->
+                                                selectedSignals = selectedSignals.toMutableList().apply {
+                                                    set(slot, signal)
+                                                }
+                                                selectedSlot = null
+                                            }
+                                        }
+                                    )
+                                }
+                            }
                         }
                     }
                 }

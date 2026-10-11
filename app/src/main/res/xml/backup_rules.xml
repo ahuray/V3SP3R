@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <full-backup-content>
     <include domain="sharedpref" path="."/>
-    <exclude domain="sharedpref" path="api_key_prefs.xml"/>
+    <!-- API keys live in EncryptedSharedPreferences bound to this device's keystore. -->
+    <exclude domain="sharedpref" path="vesper_secure_prefs.xml"/>
 </full-backup-content>

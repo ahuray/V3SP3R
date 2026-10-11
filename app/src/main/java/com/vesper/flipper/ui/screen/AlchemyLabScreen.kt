@@ -21,6 +21,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -39,9 +40,11 @@ fun AlchemyLabScreen(
     val isForging by viewModel.isForging.collectAsState()
     val currentBlueprint by viewModel.currentBlueprint.collectAsState()
     val forgeError by viewModel.forgeError.collectAsState()
+    val editingSection by viewModel.editingSection.collectAsState()
     val editingLoot by viewModel.editingLoot.collectAsState()
     val editContent by viewModel.editContent.collectAsState()
     val isSaving by viewModel.isSaving.collectAsState()
+    val workbenchLoaded by viewModel.workbenchLoaded.collectAsState()
     val filteredLoot by viewModel.filteredLoot.collectAsState()
     val selectedFilter by viewModel.selectedFilter.collectAsState()
     val isLoadingVault by viewModel.isLoadingVault.collectAsState()
@@ -211,10 +214,63 @@ fun AlchemyLabScreen(
                 onContentChange = { viewModel.updateEditContent(it) },
                 onSave = { viewModel.saveWorkbench() },
                 onDismiss = { viewModel.closeWorkbench() },
-                isSaving = isSaving
+                isSaving = isSaving,
+                isLoaded = workbenchLoaded
+            )
+        }
+
+        // Blueprint Section Editor
+        val sectionIndex = editingSection
+        val blueprintForEdit = currentBlueprint
+        if (sectionIndex != null &&
+            blueprintForEdit != null &&
+            sectionIndex in blueprintForEdit.sections.indices
+        ) {
+            BlueprintSectionEditorDialog(
+                section = blueprintForEdit.sections[sectionIndex],
+                onSave = { viewModel.updateBlueprintSection(sectionIndex, it) },
+                onDismiss = { viewModel.cancelBlueprintSectionEdit() }
             )
         }
     }
+}
+
+@Composable
+private fun BlueprintSectionEditorDialog(
+    section: BlueprintSection,
+    onSave: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var draft by remember(section) { mutableStateOf(section.value) }
+    val keyboardType = when (section.fieldType) {
+        BlueprintFieldType.NUMBER, BlueprintFieldType.FREQUENCY -> KeyboardType.Number
+        else -> KeyboardType.Text
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit ${section.label}") },
+        text = {
+            OutlinedTextField(
+                value = draft,
+                onValueChange = { draft = it },
+                label = { Text(section.label) },
+                singleLine = section.fieldType != BlueprintFieldType.TEXT,
+                keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+                textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace),
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onSave(draft) },
+                enabled = draft != section.value
+            ) { Text("Save") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -564,7 +620,8 @@ private fun WorkbenchDialog(
     onContentChange: (String) -> Unit,
     onSave: () -> Unit,
     onDismiss: () -> Unit,
-    isSaving: Boolean
+    isSaving: Boolean,
+    isLoaded: Boolean
 ) {
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -595,14 +652,25 @@ private fun WorkbenchDialog(
 
                 Divider()
 
-                OutlinedTextField(
-                    value = content,
-                    onValueChange = onContentChange,
-                    modifier = Modifier.fillMaxWidth().weight(1f),
-                    textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace, fontSize = 12.sp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = VesperOrange, unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), cursorColor = VesperOrange),
-                    shape = RoundedCornerShape(8.dp)
-                )
+                Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                    OutlinedTextField(
+                        value = content,
+                        onValueChange = onContentChange,
+                        enabled = isLoaded,
+                        modifier = Modifier.fillMaxSize(),
+                        textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace, fontSize = 12.sp),
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = VesperOrange, unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), cursorColor = VesperOrange),
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                    if (!isLoaded) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(color = VesperOrange, strokeWidth = 2.dp)
+                        }
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(loot.path, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, fontFamily = FontFamily.Monospace)
@@ -613,7 +681,7 @@ private fun WorkbenchDialog(
                     Button(
                         onClick = onSave,
                         modifier = Modifier.weight(1f),
-                        enabled = !isSaving,
+                        enabled = !isSaving && isLoaded,
                         colors = ButtonDefaults.buttonColors(containerColor = VesperOrange)
                     ) {
                         if (isSaving) CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)

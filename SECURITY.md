@@ -50,10 +50,10 @@ Every AI-initiated action is classified before execution:
 
 ### Data Protection
 
-- API keys are stored in Android's EncryptedSharedPreferences
-- Chat history is stored locally in an encrypted Room database
+- API keys are stored in Android's EncryptedSharedPreferences (keystore-backed) and excluded from backup and device transfer
+- Chat history and audit logs are stored locally in a Room database on the device; the database file itself is never uploaded and is protected by Android's app sandbox and full-disk encryption rather than a separate database password. Note that to answer your prompts the app does send the relevant conversation content (your messages and tool results) to your selected AI provider
 - No telemetry or analytics are collected
-- No data is sent to third parties (except your chosen LLM provider via OpenRouter)
+- No data is sent to third parties other than your chosen LLM provider (OpenRouter, Google Gemini, OpenAI, or xAI)
 
 ### What We Consider In-Scope
 

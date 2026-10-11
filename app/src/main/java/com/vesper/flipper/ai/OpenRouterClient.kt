@@ -5,6 +5,7 @@ import com.vesper.flipper.data.SettingsStore
 import com.vesper.flipper.domain.model.*
 import com.vesper.flipper.security.InputValidator
 import com.vesper.flipper.security.RateLimiter
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -61,6 +62,7 @@ class OpenRouterClient @Inject constructor(
         const val MAX_RETRIES = 2
         const val INITIAL_DELAY_MS = 700L
         const val MAX_DELAY_MS = 10000L
+        const val MAX_RATE_LIMIT_DELAY_MS = 30000L
         const val BACKOFF_MULTIPLIER = 2.0
     }
 
@@ -464,20 +466,28 @@ class OpenRouterClient @Inject constructor(
         var delayMs = RetryConfig.INITIAL_DELAY_MS
 
         repeat(RetryConfig.MAX_RETRIES) { attempt ->
+            val isLastAttempt = attempt == RetryConfig.MAX_RETRIES - 1
             try {
                 client.newCall(request).execute().use { response ->
                     val responseBody = response.body?.string()
 
                     // Check for rate limit from server
                     if (response.code == 429) {
-                        val retryAfter = response.header("Retry-After")?.toLongOrNull() ?: 60
-                        delay(retryAfter * 1000)
+                        if (isLastAttempt) {
+                            return ChatCompletionResult.Error(
+                                "Rate limited by the API (HTTP 429). Please retry shortly."
+                            )
+                        }
+                        // Honor Retry-After but never sleep unbounded on a hostile/large value.
+                        val retryAfterMs = (response.header("Retry-After")?.toLongOrNull() ?: 60) * 1000
+                        delay(retryAfterMs.coerceAtMost(RetryConfig.MAX_RATE_LIMIT_DELAY_MS))
                         return@repeat // Retry
                     }
 
                     // Check for server errors (5xx) - these are retryable
                     if (response.code in 500..599) {
                         lastException = IOException("Server error: ${response.code}")
+                        if (isLastAttempt) return@repeat
                         delay(delayMs)
                         delayMs = (delayMs * RetryConfig.BACKOFF_MULTIPLIER).toLong()
                             .coerceAtMost(RetryConfig.MAX_DELAY_MS)
@@ -498,19 +508,26 @@ class OpenRouterClient @Inject constructor(
                     return parseResponse(responseBody)
                 }
 
+            } catch (e: CancellationException) {
+                // Never report a cancelled request as a normal API failure.
+                throw e
             } catch (e: SocketTimeoutException) {
                 lastException = e
-                delay(delayMs)
-                delayMs = (delayMs * RetryConfig.BACKOFF_MULTIPLIER).toLong()
-                    .coerceAtMost(RetryConfig.MAX_DELAY_MS)
+                if (!isLastAttempt) {
+                    delay(delayMs)
+                    delayMs = (delayMs * RetryConfig.BACKOFF_MULTIPLIER).toLong()
+                        .coerceAtMost(RetryConfig.MAX_DELAY_MS)
+                }
             } catch (e: IOException) {
                 if (isDnsResolutionFailure(e)) {
                     return ChatCompletionResult.Error(LlmProvider.dnsFailureMessage(request.url.host))
                 }
                 lastException = e
-                delay(delayMs)
-                delayMs = (delayMs * RetryConfig.BACKOFF_MULTIPLIER).toLong()
-                    .coerceAtMost(RetryConfig.MAX_DELAY_MS)
+                if (!isLastAttempt) {
+                    delay(delayMs)
+                    delayMs = (delayMs * RetryConfig.BACKOFF_MULTIPLIER).toLong()
+                        .coerceAtMost(RetryConfig.MAX_DELAY_MS)
+                }
             } catch (e: Exception) {
                 // Non-retryable exception
                 return ChatCompletionResult.Error("Request failed: ${e.message}")
@@ -518,7 +535,8 @@ class OpenRouterClient @Inject constructor(
         }
 
         return ChatCompletionResult.Error(
-            "Request failed after ${RetryConfig.MAX_RETRIES} attempts: ${lastException?.message}"
+            "Request failed after ${RetryConfig.MAX_RETRIES} attempts: " +
+                (lastException?.message ?: "no response from API")
         )
     }
 
@@ -1010,8 +1028,8 @@ class OpenRouterClient @Inject constructor(
                         // Drop any buffered trailing comma before a closer
                         pendingComma = null
                         sb.append(ch)
-                        if (ch == '}' && stack.lastOrNull() == '{') stack.removeLast()
-                        else if (ch == ']' && stack.lastOrNull() == '[') stack.removeLast()
+                        if (ch == '}' && stack.lastOrNull() == '{') stack.removeAt(stack.lastIndex)
+                        else if (ch == ']' && stack.lastOrNull() == '[') stack.removeAt(stack.lastIndex)
                     }
                     else -> {
                         if (ch.isWhitespace() && pendingComma != null) {

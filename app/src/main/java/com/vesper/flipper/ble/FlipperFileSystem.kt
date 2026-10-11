@@ -278,11 +278,23 @@ class FlipperFileSystem @Inject constructor(
         return try {
             val validatedCommand = validateCliCommand(command)
             val hasRpcMapping = shouldUseRpcAppBridge(validatedCommand)
-            val compatibility = FirmwareCompatibilityLayer.assessCliCommand(
+            var compatibility = FirmwareCompatibilityLayer.assessCliCommand(
                 profile = protocol.firmwareCompatibility.value,
                 command = validatedCommand,
                 hasRpcMapping = hasRpcMapping
             )
+            if (!compatibility.supported &&
+                protocol.firmwareCompatibility.value.transportMode == FirmwareTransportMode.UNAVAILABLE
+            ) {
+                // A transient probe failure may have left the profile UNAVAILABLE.
+                // Re-probe before rejecting so a recovered transport is not blocked.
+                protocol.probeCliAvailability(force = true)
+                compatibility = FirmwareCompatibilityLayer.assessCliCommand(
+                    profile = protocol.firmwareCompatibility.value,
+                    command = validatedCommand,
+                    hasRpcMapping = hasRpcMapping
+                )
+            }
             if (!compatibility.supported) {
                 return finish(
                     Result.failure(

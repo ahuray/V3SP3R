@@ -155,14 +155,25 @@ class ChatViewModel @Inject constructor(
             }
         }
 
-        // Auto-add glasses photos to pending images so they appear in chat input
+        // Auto-add glasses photos to pending images so they appear in chat input.
+        // When the integration later clears the held photo (sent on timeout or
+        // combined with a voice command), drop it from pending so the user's own
+        // send can't attach the same photo a second time.
         viewModelScope.launch {
+            var lastGlassesPhotoId: String? = null
             glassesIntegration.pendingGlassesPhoto.collect { photo ->
-                if (photo != null && _pendingImages.value.size < MAX_PENDING_IMAGES) {
-                    // Add to pending images if not already there
-                    if (_pendingImages.value.none { it.id == photo.id }) {
+                if (photo != null) {
+                    if (_pendingImages.value.size < MAX_PENDING_IMAGES &&
+                        _pendingImages.value.none { it.id == photo.id }
+                    ) {
                         _pendingImages.value = _pendingImages.value + photo
+                        lastGlassesPhotoId = photo.id
                     }
+                } else {
+                    lastGlassesPhotoId?.let { id ->
+                        _pendingImages.value = _pendingImages.value.filter { it.id != id }
+                    }
+                    lastGlassesPhotoId = null
                 }
             }
         }
@@ -271,7 +282,10 @@ class ChatViewModel @Inject constructor(
         super.onCleared()
         speechRecognitionHelper.destroy()
         ttsService.stop()
-        glassesIntegration.disconnect()
+        // Do NOT disconnect the glasses bridge here: GlassesIntegration is an
+        // app-scoped singleton shared across ViewModel recreations (e.g. config
+        // changes). Disconnecting on VM clear would drop a live glasses session.
+        // The bridge is torn down explicitly via disconnectGlasses().
     }
 
     fun updateInput(text: String) {

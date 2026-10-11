@@ -212,7 +212,9 @@ object SignalParser {
         val lines = content.lines()
         val props = parseProperties(lines)
 
-        val protocol = props["Protocol"] ?: return null
+        // Flipper RFID files written by ForgeEngine use "Key type:" rather than
+        // "Protocol:"; accept both so generated files parse.
+        val protocol = props["Protocol"] ?: props["Key type"] ?: return null
         val keyData = props["Data"] ?: return null
 
         return SignalCapture.Rfid(
@@ -228,7 +230,9 @@ object SignalParser {
         val lines = content.lines()
         val props = parseProperties(lines)
 
-        val protocol = props["Protocol"] ?: return null
+        // Flipper iButton files written by ForgeEngine use "Key type:" rather
+        // than "Protocol:"; accept both so generated files parse.
+        val protocol = props["Protocol"] ?: props["Key type"] ?: return null
         val keyData = props["Data"] ?: props["Key"] ?: return null
 
         return SignalCapture.IButton(

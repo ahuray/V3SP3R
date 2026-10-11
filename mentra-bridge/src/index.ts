@@ -1,5 +1,6 @@
 import { WebSocketServer, WebSocket } from "ws";
 import { createServer } from "http";
+import { timingSafeEqual } from "crypto";
 
 /**
  * V3SP3R ↔ Mentra Glasses Bridge Server
@@ -42,20 +43,106 @@ interface GlassesMessage {
 interface ConnectedClient {
   ws: WebSocket;
   type: "glasses" | "vesper" | "unknown";
+  room: string;
   connectedAt: number;
 }
 
 const clients = new Map<WebSocket, ConnectedClient>();
 
-function getVesperClients(): WebSocket[] {
+// ==================== Auth & Routing ====================
+// A shared token authenticates clients so arbitrary WebSocket callers cannot
+// claim a role and receive another user's photos/transcripts or inject
+// commands. A "room" scopes relay traffic so independent glasses+phone pairs
+// don't leak into each other.
+
+const AUTH_TOKEN = process.env.BRIDGE_AUTH_TOKEN;
+const ALLOW_INSECURE = process.env.BRIDGE_ALLOW_INSECURE === "true";
+const DEFAULT_ROOM = process.env.BRIDGE_ROOM || "default";
+
+// Room the MentraOS native integration binds its sessions and broadcasts to.
+// Defaults to DEFAULT_ROOM (single-pair deployments); set MENTRA_ROOM to isolate
+// MentraOS traffic to a specific room when multiple pairs share one bridge.
+const MENTRA_ROOM = process.env.MENTRA_ROOM || DEFAULT_ROOM;
+
+// Optional per-room tokens so a presented token proves authorization for a
+// specific room, not merely entry to the bridge. Without this, any client
+// holding the shared token could join another pair's room and read its photos
+// and transcripts or inject its commands.
+// Format: BRIDGE_ROOM_TOKENS='{"roomA":"tokenA","roomB":"tokenB"}'
+const ROOM_TOKENS: Record<string, string> = (() => {
+  const raw = process.env.BRIDGE_ROOM_TOKENS;
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      // Keep only non-empty string tokens; a non-string value would make
+      // tokensMatch → Buffer.from(value) throw and reject every connection.
+      const result: Record<string, string> = {};
+      for (const [room, token] of Object.entries(parsed)) {
+        if (typeof token === "string" && token.length > 0) {
+          result[room] = token;
+        } else {
+          console.warn(
+            `[Auth] Dropping BRIDGE_ROOM_TOKENS entry "${room}": value must be a non-empty string.`
+          );
+        }
+      }
+      return result;
+    }
+    console.warn("[Auth] Ignoring BRIDGE_ROOM_TOKENS: expected a JSON object of room→token.");
+  } catch (e) {
+    console.warn(`[Auth] Ignoring invalid BRIDGE_ROOM_TOKENS JSON: ${(e as Error).message}`);
+  }
+  return {};
+})();
+
+function tokensMatch(expected: string, provided: string): boolean {
+  const e = Buffer.from(expected);
+  const p = Buffer.from(provided);
+  if (e.length !== p.length) return false;
+  return timingSafeEqual(e, p);
+}
+
+/**
+ * Authorize a connecting client for the specific room it requested.
+ * A token proves room authorization, so a valid credential for one room cannot
+ * be used to join another.
+ */
+function authorizeRoom(providedToken: string | undefined, requestedRoom: string): boolean {
+  // A room with its own token requires exactly that token.
+  const roomToken = ROOM_TOKENS[requestedRoom];
+  if (roomToken) {
+    return !!providedToken && tokensMatch(roomToken, providedToken);
+  }
+  // Rooms without a dedicated token are reachable only via the shared token,
+  // and only the default room — this blocks arbitrary-room hijacking.
+  if (AUTH_TOKEN) {
+    if (requestedRoom !== DEFAULT_ROOM) return false;
+    return !!providedToken && tokensMatch(AUTH_TOKEN, providedToken);
+  }
+  // No tokens configured at all — refuse unless the operator opted in.
+  return ALLOW_INSECURE;
+}
+
+/** Normalize speech for echo/approval comparison. */
+function normalizeSpeech(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
+}
+
+/** True when the utterance is a bare approval/control word that must never be dropped. */
+function isApprovalWord(text: string): boolean {
+  return APPROVAL_WORDS.has(normalizeSpeech(text));
+}
+
+function getVesperClients(room?: string): WebSocket[] {
   return Array.from(clients.entries())
-    .filter(([, c]) => c.type === "vesper")
+    .filter(([, c]) => c.type === "vesper" && (room === undefined || c.room === room))
     .map(([ws]) => ws);
 }
 
-function getGlassesClients(): WebSocket[] {
+function getGlassesClients(room?: string): WebSocket[] {
   return Array.from(clients.entries())
-    .filter(([, c]) => c.type === "glasses")
+    .filter(([, c]) => c.type === "glasses" && (room === undefined || c.room === room))
     .map(([ws]) => ws);
 }
 
@@ -65,6 +152,24 @@ export function broadcast(targets: WebSocket[], message: GlassesMessage) {
     if (ws.readyState === WebSocket.OPEN) {
       ws.send(payload);
     }
+  }
+}
+
+// ── Vision-trigger capture fallback (relay mode) ───────────────────
+// A vision-triggered VOICE_COMMAND asks the glasses to capture first. If no
+// CAMERA_PHOTO arrives in time (camera failure, offline glasses), fall back to
+// forwarding the original command so the request is never silently dropped.
+const VISION_CAPTURE_TIMEOUT_MS = 8_000;
+const pendingVisionCommands = new Map<
+  string,
+  { message: GlassesMessage; timer: ReturnType<typeof setTimeout> }
+>();
+
+function clearPendingVisionCommand(room: string) {
+  const pending = pendingVisionCommands.get(room);
+  if (pending) {
+    clearTimeout(pending.timer);
+    pendingVisionCommands.delete(room);
   }
 }
 
@@ -185,6 +290,21 @@ const wss = new WebSocketServer({ port: PORT });
 
 console.log(`V3SP3R Glasses Bridge running on port ${PORT}`);
 
+if (AUTH_TOKEN) {
+  console.log("[Auth] Token authentication enabled.");
+} else if (ALLOW_INSECURE) {
+  console.warn(
+    "[Auth] WARNING: BRIDGE_AUTH_TOKEN is not set and BRIDGE_ALLOW_INSECURE=true — " +
+      "the bridge accepts any client. Only use this on a trusted/local network."
+  );
+} else {
+  console.warn(
+    "[Auth] BRIDGE_AUTH_TOKEN is not set. All WebSocket connections will be REJECTED. " +
+      "Set BRIDGE_AUTH_TOKEN (and configure the same token in the V3SP3R app), " +
+      "or set BRIDGE_ALLOW_INSECURE=true for trusted local testing."
+  );
+}
+
 // ==================== Heartbeat (keeps connections alive through proxies) ====================
 
 const HEARTBEAT_INTERVAL_MS = 25_000; // 25s — safely under Cloudflare's 100s idle timeout
@@ -209,12 +329,38 @@ const heartbeatTimer = setInterval(() => {
 wss.on("close", () => clearInterval(heartbeatTimer));
 
 wss.on("connection", (ws, req) => {
+  const url = new URL(req.url || "/", "http://localhost");
+  // A repeated header arrives as an array in Node; take the first value.
+  const firstHeader = (value: string | string[] | undefined): string | undefined =>
+    Array.isArray(value) ? value[0] : value;
+
+  const providedToken =
+    firstHeader(req.headers["x-vesper-token"]) ||
+    url.searchParams.get("token") ||
+    undefined;
+
+  const rawRoom =
+    firstHeader(req.headers["x-vesper-room"]) ||
+    url.searchParams.get("room") ||
+    DEFAULT_ROOM;
+  const room = rawRoom.trim() || DEFAULT_ROOM;
+
+  // Authorize for the specific room so a token cannot be used to join another.
+  if (!authorizeRoom(providedToken, room)) {
+    console.warn(
+      `[Auth] Rejecting unauthorized client from ${req.socket.remoteAddress} (room "${room}")`
+    );
+    ws.close(4401, "Unauthorized");
+    return;
+  }
+
   const clientId = req.headers["x-vesper-client"] as string | undefined;
   const clientType = clientId === "v3sp3r-android" ? "vesper" : "unknown";
 
   const client: ConnectedClient = {
     ws,
     type: clientType as "glasses" | "vesper" | "unknown",
+    room,
     connectedAt: Date.now(),
   };
   clients.set(ws, client);
@@ -271,27 +417,51 @@ function handleMessage(sender: WebSocket, message: GlassesMessage) {
         console.log("[Muted] Suppressing voice input");
         break;
       }
-      broadcast(getVesperClients(), message);
 
-      // Relay mode vision trigger: ask glasses to capture a photo
-      if (message.text) {
-        const lower = message.text.toLowerCase();
-        const visionTriggers = [
-          "what am i looking at", "what do you see", "what is this",
-          "analyze this", "scan this", "identify this",
-          "take a photo", "take a picture", "capture this",
-          "what's this", "what's that", "what is that",
-          "turn on this", "turn off this", "turn on that", "turn off that",
-          "this tv", "that tv", "this ac", "that ac",
-          "i'm looking at", "right in front of me",
-        ];
-        if (visionTriggers.some((t) => lower.includes(t))) {
+      {
+        // Relay mode vision trigger: when the command needs the camera, ask the
+        // glasses to capture first and let the resulting CAMERA_PHOTO (which
+        // carries this text as its prompt) drive the agent. Forwarding the bare
+        // command now would make the agent act before the photo arrives.
+        const visionTriggered =
+          message.type === "VOICE_COMMAND" &&
+          !!message.text &&
+          (() => {
+            const lower = message.text!.toLowerCase();
+            const visionTriggers = [
+              "what am i looking at", "what do you see", "what is this",
+              "analyze this", "scan this", "identify this",
+              "take a photo", "take a picture", "capture this",
+              "what's this", "what's that", "what is that",
+              "turn on this", "turn off this", "turn on that", "turn off that",
+              "this tv", "that tv", "this ac", "that ac",
+              "i'm looking at", "right in front of me",
+            ];
+            return visionTriggers.some((t) => lower.includes(t));
+          })();
+
+        if (visionTriggered) {
           console.log("[Relay] Vision trigger detected, requesting photo from glasses");
-          broadcast(getGlassesClients(), {
+          const room = client.room;
+          // Arm a fallback: if the photo never arrives, forward the bare command
+          // so a capture failure doesn't lose the user's request.
+          clearPendingVisionCommand(room);
+          const timer = setTimeout(() => {
+            pendingVisionCommands.delete(room);
+            console.warn(
+              "[Relay] No photo after vision trigger — forwarding command without image"
+            );
+            broadcast(getVesperClients(room), message);
+          }, VISION_CAPTURE_TIMEOUT_MS);
+          pendingVisionCommands.set(room, { message, timer });
+
+          broadcast(getGlassesClients(room), {
             type: "CAPTURE_REQUEST",
             text: message.text,
             metadata: { reason: "vision-trigger" },
           });
+        } else {
+          broadcast(getVesperClients(client.room), message);
         }
       }
       break;
@@ -301,7 +471,9 @@ function handleMessage(sender: WebSocket, message: GlassesMessage) {
         client.type = "glasses";
         console.log("Client identified as glasses");
       }
-      broadcast(getVesperClients(), message);
+      // Photo arrived — cancel the pending bare-command fallback for this room.
+      clearPendingVisionCommand(client.room);
+      broadcast(getVesperClients(client.room), message);
       break;
 
     case "AI_RESPONSE":
@@ -310,7 +482,7 @@ function handleMessage(sender: WebSocket, message: GlassesMessage) {
         client.type = "vesper";
         console.log("Client identified as vesper");
       }
-      broadcast(getGlassesClients(), message);
+      broadcast(getGlassesClients(client.room), message);
       break;
 
     case "CAPTURE_REQUEST":
@@ -321,7 +493,7 @@ function handleMessage(sender: WebSocket, message: GlassesMessage) {
         console.log("Client identified as vesper (via CAPTURE_REQUEST)");
       }
       console.log("[Relay] Capture request from V3SP3R — forwarding to glasses");
-      broadcast(getGlassesClients(), message);
+      broadcast(getGlassesClients(client.room), message);
       break;
 
     case "CONFIG":
@@ -446,10 +618,15 @@ async function startMentraIntegration() {
             if (glassesMuted) return; // Muted — suppress all voice input
 
             // ── TTS Echo Suppression ────────────────────────────
-            // Suppress transcriptions while TTS is playing or in cooldown
+            // Suppress transcriptions while TTS is playing or in cooldown, but
+            // never swallow a bare approval/control word — a quick "yes"/"stop"
+            // right after Vesper speaks must still confirm or cancel the action.
             if (ttsSpeaking || Date.now() < ttsEchoSuppressionUntil) {
-              console.log(`[Echo] Suppressed during TTS: "${data.text.trim().slice(0, 40)}"`);
-              return;
+              if (!isApprovalWord(data.text.trim())) {
+                console.log(`[Echo] Suppressed during TTS: "${data.text.trim().slice(0, 40)}"`);
+                return;
+              }
+              console.log(`[Echo] Allowing approval word during TTS: "${data.text.trim().slice(0, 40)}"`);
             }
             // Also catch echoes that slip past the timing window
             if (isLikelyTtsEcho(data.text.trim())) {
@@ -491,7 +668,7 @@ async function startMentraIntegration() {
                 lastTaskTimestamp = Date.now();
                 resetAwaitingState();
 
-                broadcast(getVesperClients(), {
+                broadcast(getVesperClients(MENTRA_ROOM), {
                   type: "VOICE_COMMAND",
                   text: command!,
                   metadata: {
@@ -530,7 +707,7 @@ async function startMentraIntegration() {
                   // Session WebSocket may have disconnected
                 }
 
-                broadcast(getVesperClients(), {
+                broadcast(getVesperClients(MENTRA_ROOM), {
                   type: "STATUS_UPDATE",
                   text: "Vesper listening...",
                   metadata: { source: "mentra", wake_word: "true" },
@@ -545,7 +722,7 @@ async function startMentraIntegration() {
               lastTaskTimestamp = Date.now();
               resetAwaitingState();
 
-              broadcast(getVesperClients(), {
+              broadcast(getVesperClients(MENTRA_ROOM), {
                 type: "VOICE_COMMAND",
                 text: rawText,
                 metadata: {
@@ -563,7 +740,7 @@ async function startMentraIntegration() {
             // ── No wake word, not armed — relay as passive transcription ──
             // (only sent if auto-send is on in the Android app)
             console.log(`[MentraOS] Voice (passive): "${rawText}"`);
-            broadcast(getVesperClients(), {
+            broadcast(getVesperClients(MENTRA_ROOM), {
               type: "VOICE_TRANSCRIPTION",
               text: rawText,
               isFinal: true,
@@ -581,7 +758,7 @@ async function startMentraIntegration() {
         function broadcastPhoto(rawData: any, prompt: string, mimeType?: string) {
           const imageBase64 = Buffer.from(rawData).toString("base64");
           console.log(`[MentraOS] Photo captured: ${imageBase64.length} chars base64`);
-          broadcast(getVesperClients(), {
+          broadcast(getVesperClients(MENTRA_ROOM), {
             type: "CAMERA_PHOTO",
             text: prompt,
             imageBase64,
@@ -696,6 +873,7 @@ async function startMentraIntegration() {
         clients.set(virtualWs, {
           ws: virtualWs,
           type: "glasses",
+          room: MENTRA_ROOM,
           connectedAt: Date.now(),
         });
 
@@ -847,7 +1025,7 @@ async function captureAndAnalyze(session: any, prompt: string) {
     const imageBase64 = Buffer.from(rawData).toString("base64");
     console.log(`[MentraOS] Photo received: ${imageBase64.length} chars, mime: ${photo.mimeType || "image/jpeg"}`);
 
-    broadcast(getVesperClients(), {
+    broadcast(getVesperClients(MENTRA_ROOM), {
       type: "CAMERA_PHOTO",
       text: prompt,
       imageBase64,
@@ -874,7 +1052,7 @@ async function captureAndAnalyze(session: any, prompt: string) {
  */
 async function speakWithEchoGuard(session: any, text: string) {
   ttsSpeaking = true;
-  lastSpokenText = text.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
+  lastSpokenText = normalizeSpeech(text);
   try {
     await session.audio.speak(text, {
       language: "en-GB",
@@ -890,10 +1068,19 @@ async function speakWithEchoGuard(session: any, text: string) {
  * Check if a transcription looks like an echo of recent TTS output.
  * Compares normalized text similarity.
  */
+// Short approval/control words must never be swallowed as TTS echoes — they
+// are how the user confirms or cancels high-risk actions.
+const APPROVAL_WORDS = new Set([
+  "yes", "yeah", "yep", "yup", "no", "nope", "nah",
+  "confirm", "cancel", "stop", "go", "ok", "okay", "do it", "approve", "deny",
+]);
+
 function isLikelyTtsEcho(transcription: string): boolean {
   if (!lastSpokenText) return false;
   const normalized = transcription.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
   if (!normalized) return false;
+  // Never treat a bare approval/control phrase as an echo.
+  if (APPROVAL_WORDS.has(normalized)) return false;
   // Check if the transcription is a substring of what was spoken or vice versa
   if (lastSpokenText.includes(normalized) || normalized.includes(lastSpokenText)) {
     return true;

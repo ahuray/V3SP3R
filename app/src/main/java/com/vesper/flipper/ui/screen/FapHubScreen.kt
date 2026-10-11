@@ -532,7 +532,7 @@ private fun InstallButton(isInstalled: Boolean, status: InstallStatus?, onInstal
         is InstallStatus.Success -> Icon(Icons.Default.CheckCircle, "Installed", tint = RiskLow, modifier = Modifier.size(40.dp))
         is InstallStatus.Error -> Icon(Icons.Default.Error, "Error", tint = RiskHigh, modifier = Modifier.size(40.dp))
         else -> {
-            if (isInstalled) OutlinedButton(onClick = onUninstall, colors = ButtonDefaults.outlinedButtonColors(contentColor = RiskHigh), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)) { Icon(Icons.Default.Delete, null, modifier = Modifier.size(16.dp)) }
+            if (isInstalled) OutlinedButton(onClick = onUninstall, colors = ButtonDefaults.outlinedButtonColors(contentColor = RiskHigh), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)) { Icon(Icons.Default.Delete, "Uninstall", modifier = Modifier.size(16.dp)) }
             else Button(onClick = onInstall, colors = ButtonDefaults.buttonColors(containerColor = VesperOrange), contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) { Icon(Icons.Default.Download, null, modifier = Modifier.size(16.dp)); Spacer(modifier = Modifier.width(4.dp)); Text("Install") }
         }
     }

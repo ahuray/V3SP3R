@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vesper.flipper.ble.FlipperFileSystem
 import com.vesper.flipper.domain.executor.ForgeEngine
+import com.vesper.flipper.domain.executor.ForgeValidator
 import com.vesper.flipper.domain.model.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -51,6 +52,16 @@ class AlchemyLabViewModel @Inject constructor(
 
     private val _isSaving = MutableStateFlow(false)
     val isSaving: StateFlow<Boolean> = _isSaving.asStateFlow()
+
+    // True once the current workbench file has been read successfully. Guards
+    // against saving stale/empty content when the read failed or is pending.
+    private val _workbenchLoaded = MutableStateFlow(false)
+    val workbenchLoaded: StateFlow<Boolean> = _workbenchLoaded.asStateFlow()
+
+    // Bumped every time the workbench opens or closes. A pending file read only
+    // applies if its captured epoch still matches, so an older read can't
+    // overwrite newer edits after the user closed/reopened a file.
+    private var workbenchEpoch = 0
 
     // ═══════════════════════════════════════════════════════
     // THE VAULT — Loot Inventory State
@@ -187,30 +198,115 @@ class AlchemyLabViewModel @Inject constructor(
         _editingSection.value = index
     }
 
+    fun cancelBlueprintSectionEdit() {
+        _editingSection.value = null
+    }
+
     fun updateBlueprintSection(index: Int, newValue: String) {
         val blueprint = _currentBlueprint.value ?: return
         val sections = blueprint.sections.toMutableList()
-        if (index in sections.indices) {
-            sections[index] = sections[index].copy(value = newValue)
-            _currentBlueprint.value = blueprint.copy(sections = sections)
+        if (index !in sections.indices) {
+            _editingSection.value = null
+            return
         }
+
+        val section = sections[index]
+        val oldValue = section.value
+
+        // Sections are extracted from the payload as "Key: value" lines, so a saved
+        // edit must be written back into generatedCode — otherwise deploy keeps
+        // writing the original payload and the edit silently does nothing.
+        val updatedCode = if (oldValue != newValue) {
+            rewriteSectionLine(blueprint.generatedCode, section.label, oldValue, newValue)
+        } else {
+            blueprint.generatedCode
+        }
+
+        if (updatedCode == null) {
+            // The field could not be located in the payload; reject rather than
+            // risk editing an unrelated line that happens to share this value.
+            _message.value = "Couldn't apply edit to \"${section.label}\" — field not found in payload"
+            _editingSection.value = null
+            return
+        }
+
+        sections[index] = section.copy(value = newValue)
+
+        // Surface validation so an edit that breaks the payload is caught before deploy.
+        val validation = ForgeValidator.validate(updatedCode, blueprint.payloadType)
+        _forgeError.value = validation.errors.takeIf { it.isNotEmpty() }
+            ?.let { "Validation: ${it.joinToString("; ")}" }
+        if (validation.warnings.isNotEmpty()) {
+            _message.value = "Warning: ${validation.warnings.first()}"
+        }
+
+        _currentBlueprint.value = blueprint.copy(
+            sections = sections,
+            generatedCode = updatedCode
+        )
         _editingSection.value = null
     }
+
+    /**
+     * Rewrite the payload line that backs an edited section, inverting the
+     * section-extraction logic so edits reach the deployable payload. The target
+     * line is located by its field key (the section [label]) first, so two fields
+     * that share a value can't be confused; a value match is only a fallback for
+     * when the label differs from the file key. Returns null if no line matches,
+     * so the caller can reject the edit rather than corrupt an unrelated line.
+     */
+    private fun rewriteSectionLine(code: String, label: String, oldValue: String, newValue: String): String? {
+        val lines = code.split("\n").toMutableList()
+        val targetKey = normalizeFieldKey(label)
+
+        var idx = lines.indexOfFirst { line ->
+            val colon = line.indexOf(':')
+            colon > 0 && normalizeFieldKey(line.substring(0, colon)) == targetKey
+        }
+        if (idx < 0 && oldValue.isNotBlank()) {
+            idx = lines.indexOfFirst { line ->
+                line.contains(":") && line.substringAfter(":").trim() == oldValue
+            }
+        }
+        if (idx < 0) return null
+
+        val line = lines[idx]
+        val key = line.substringBefore(":")
+        val leadingWs = line.substringAfter(":").takeWhile { it == ' ' || it == '\t' }
+        lines[idx] = "$key:$leadingWs$newValue"
+        return lines.joinToString("\n")
+    }
+
+    /** Normalize a field label/key for matching (e.g. "Device Type" == "Device type"). */
+    private fun normalizeFieldKey(s: String): String =
+        s.lowercase().replace(Regex("[^a-z0-9]"), "")
 
     // ═══════════════════════════════════════════════════════
     // WORKBENCH ACTIONS
     // ═══════════════════════════════════════════════════════
 
     fun openInWorkbench(loot: LootCard) {
+        val epoch = ++workbenchEpoch
         _editingLoot.value = loot
+        _editContent.value = ""
+        _workbenchLoaded.value = false
         viewModelScope.launch {
             try {
                 val content = fileSystem.readFile(loot.path)
+                // Ignore this read if the workbench has since been closed or
+                // reopened — tying to the epoch (not just the path) prevents a
+                // stale read of the same file from clobbering newer edits.
+                if (workbenchEpoch != epoch) return@launch
                 if (content.isSuccess) {
                     _editContent.value = content.getOrDefault("")
+                    _workbenchLoaded.value = true
+                } else {
+                    _message.value = "Failed to read: ${content.exceptionOrNull()?.message}"
                 }
             } catch (e: Exception) {
-                _message.value = "Failed to read: ${e.message}"
+                if (workbenchEpoch == epoch) {
+                    _message.value = "Failed to read: ${e.message}"
+                }
             }
         }
     }
@@ -221,13 +317,19 @@ class AlchemyLabViewModel @Inject constructor(
 
     fun saveWorkbench() {
         val loot = _editingLoot.value ?: return
+        if (!_workbenchLoaded.value) {
+            _message.value = "Can't save yet — the file hasn't loaded"
+            return
+        }
         viewModelScope.launch {
             _isSaving.value = true
             try {
                 val result = fileSystem.writeFile(loot.path, _editContent.value)
                 if (result.isSuccess) {
                     _message.value = "Saved ${loot.name}"
+                    workbenchEpoch++
                     _editingLoot.value = null
+                    _workbenchLoaded.value = false
                 } else {
                     _message.value = "Save failed: ${result.exceptionOrNull()?.message}"
                 }
@@ -240,8 +342,10 @@ class AlchemyLabViewModel @Inject constructor(
     }
 
     fun closeWorkbench() {
+        workbenchEpoch++
         _editingLoot.value = null
         _editContent.value = ""
+        _workbenchLoaded.value = false
     }
 
     // ═══════════════════════════════════════════════════════

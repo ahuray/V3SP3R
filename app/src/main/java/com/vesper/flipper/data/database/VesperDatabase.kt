@@ -98,6 +98,19 @@ interface ChatDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(message: ChatMessageEntity)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(messages: List<ChatMessageEntity>)
+
+    /**
+     * Replace a session's messages atomically so an interrupted save can never
+     * leave the stored conversation empty or partially written.
+     */
+    @Transaction
+    suspend fun replaceSession(sessionId: String, messages: List<ChatMessageEntity>) {
+        deleteSession(sessionId)
+        insertAll(messages)
+    }
+
     @Query("SELECT * FROM chat_messages WHERE sessionId = :sessionId ORDER BY timestamp ASC")
     fun getMessagesForSession(sessionId: String): Flow<List<ChatMessageEntity>>
 

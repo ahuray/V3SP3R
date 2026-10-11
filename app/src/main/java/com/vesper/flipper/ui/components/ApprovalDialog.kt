@@ -2,7 +2,7 @@ package com.vesper.flipper.ui.components
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -16,8 +16,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -272,12 +274,14 @@ private fun DoubleTapConfirmButton(
                     else -> RiskHigh.copy(alpha = 0.2f)
                 }
             )
-            .pointerInput(enabled) {
-                detectTapGestures(
-                    onTap = {
-                        if (enabled) latestOnTap()
-                    }
-                )
+            .clickable(
+                enabled = enabled,
+                onClickLabel = if (isArmed) "Confirm high-risk action" else "Arm confirmation",
+                role = Role.Button,
+                onClick = { latestOnTap() }
+            )
+            .semantics {
+                stateDescription = if (isArmed) "Armed, activate to confirm" else "Not armed"
             },
         contentAlignment = Alignment.Center
     ) {

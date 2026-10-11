@@ -44,7 +44,10 @@ import kotlinx.coroutines.launch
 @Composable
 fun DeviceScreen(
     viewModel: DeviceViewModel = hiltViewModel(),
-    onNavigateToFiles: () -> Unit = {}
+    onNavigateToFiles: () -> Unit = {},
+    onNavigateToOracle: () -> Unit = {},
+    onNavigateToArsenal: () -> Unit = {},
+    onNavigateToPayloadLab: () -> Unit = {}
 ) {
     val connectionState by viewModel.connectionState.collectAsState()
     val discoveredDevices by viewModel.discoveredDevices.collectAsState()
@@ -70,6 +73,24 @@ fun DeviceScreen(
                     Text("Device", fontWeight = FontWeight.Bold)
                 },
                 actions = {
+                    IconButton(onClick = onNavigateToArsenal) {
+                        Icon(
+                            Icons.Default.Sensors,
+                            contentDescription = "Signal Arsenal"
+                        )
+                    }
+                    IconButton(onClick = onNavigateToOracle) {
+                        Icon(
+                            Icons.Default.Visibility,
+                            contentDescription = "Spectral Oracle"
+                        )
+                    }
+                    IconButton(onClick = onNavigateToPayloadLab) {
+                        Icon(
+                            Icons.Default.Code,
+                            contentDescription = "Payload Lab"
+                        )
+                    }
                     if (connectionState is ConnectionState.Connected) {
                         IconButton(onClick = onNavigateToFiles) {
                             Icon(
@@ -1235,14 +1256,25 @@ private fun AdvancedOperationsSection(
                             else if (macroSteps.isNotEmpty()) {
                                 replayJob = scope.launch {
                                     isReplaying = true; replayStatus = "Replaying..."
-                                    macroSteps.forEachIndexed { i, step ->
-                                        if (!isActive) return@launch
-                                        if (step.delayMs > 0L) delay(step.delayMs)
-                                        replayStatus = "Step ${i + 1}/${macroSteps.size}: ${step.button.label}"
-                                        viewModel.sendRemoteButtonAwait(step.button, step.longPress)
-                                        delay(160)
+                                    try {
+                                        macroSteps.forEachIndexed { i, step ->
+                                            if (!isActive) return@launch
+                                            if (step.delayMs > 0L) delay(step.delayMs)
+                                            replayStatus = "Step ${i + 1}/${macroSteps.size}: ${step.button.label}"
+                                            val result = viewModel.sendRemoteButtonAwait(step.button, step.longPress)
+                                            if (result.isFailure) {
+                                                replayStatus = "Stopped at step ${i + 1}/${macroSteps.size}: " +
+                                                    (result.exceptionOrNull()?.message ?: "send failed")
+                                                return@launch
+                                            }
+                                            delay(160)
+                                        }
+                                        if (isActive) {
+                                            replayStatus = "Done (${macroSteps.size} steps)."
+                                        }
+                                    } finally {
+                                        isReplaying = false
                                     }
-                                    replayStatus = "Done (${macroSteps.size} steps)."; isReplaying = false
                                 }
                             }
                         }) { Text(if (isReplaying) "Stop" else "Replay") }

@@ -142,7 +142,10 @@ fun VesperApp() {
                     // Map sub-screens to their parent bottom-nav tab
                     val subScreenParents = mapOf(
                         Screen.Audit.route to Screen.Chat.route,
-                        Screen.Files.route to Screen.Device.route
+                        Screen.Files.route to Screen.Device.route,
+                        Screen.Oracle.route to Screen.Device.route,
+                        Screen.Arsenal.route to Screen.Device.route,
+                        Screen.PayloadLab.route to Screen.Device.route
                     )
                     val currentRoute = currentDestination?.route
                     val effectiveRoute = subScreenParents[currentRoute] ?: currentRoute
@@ -220,7 +223,27 @@ fun VesperApp() {
                     DeviceScreen(
                         onNavigateToFiles = {
                             navController.navigate(Screen.Files.route)
+                        },
+                        onNavigateToOracle = {
+                            navController.navigate(Screen.Oracle.route)
+                        },
+                        onNavigateToArsenal = {
+                            navController.navigate(Screen.Arsenal.route)
+                        },
+                        onNavigateToPayloadLab = {
+                            navController.navigate(Screen.PayloadLab.route)
                         }
+                    )
+                }
+                composable(Screen.Oracle.route) {
+                    SpectralOracleScreen()
+                }
+                composable(Screen.Arsenal.route) {
+                    SignalArsenalScreen()
+                }
+                composable(Screen.PayloadLab.route) {
+                    PayloadLabScreen(
+                        onNavigateBack = { navController.popBackStack() }
                     )
                 }
                 composable(Screen.Settings.route) {

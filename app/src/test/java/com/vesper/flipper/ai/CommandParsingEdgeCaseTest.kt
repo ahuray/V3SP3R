@@ -1,32 +1,62 @@
 package com.vesper.flipper.ai
 
+import com.vesper.flipper.data.SettingsStore
 import com.vesper.flipper.domain.model.*
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import org.junit.Assert.*
 import org.junit.Test
+import org.mockito.kotlin.mock
 
 /**
  * Comprehensive edge-case tests for AI tool-call JSON parsing.
  *
- * These tests exercise the same parsing logic as [OpenRouterClient.parseCommandDetailed]
- * — covering every shape variation that models in the wild produce.
+ * Every case drives the real production parser
+ * [OpenRouterClient.parseCommandDetailed] / [OpenRouterClient.parseCommand] so the
+ * tests cannot drift away from the shipped behavior. The client is constructed with a
+ * mocked [SettingsStore]; the parser never touches it, so no stubbing is required.
+ *
+ * Inputs that omit `justification` / `expected_effect` deliberately bypass the strict
+ * kotlinx.serialization fast-path and exercise the manual fallback parser (alias
+ * resolution, shape coercion, required-arg validation).
  *
  * Groups:
  *  1. Strict-path: well-formed JSON that decodes via kotlinx.serialization directly
- *  2. Fallback-path: malformed/variant JSON that requires the manual fallback parser
- *  3. Action alias resolution
- *  4. Args shape variations (string-wrapped, array-wrapped, missing, empty)
- *  5. Field alias coverage for every CommandArgs property
- *  6. Required-arg validation per action
- *  7. Error cases (totally broken JSON, wrong types, missing action)
+ *  2. Action alias resolution
+ *  3. Args shape variations (string-wrapped, array-wrapped, missing, empty)
+ *  4. Field alias coverage for CommandArgs properties
+ *  5. Root-level field fallback
+ *  6. Error cases (totally broken JSON, wrong types, missing action)
+ *  7. `parameters` key as an alias for `args`
+ *  8. ArgumentsAsStringSerializer coverage
+ *  9. install_faphub_app field mapping
+ * 10. End-to-end serializer round-trips
  */
 class CommandParsingEdgeCaseTest {
 
+    /** The parser is pure with respect to settings, so a bare mock is sufficient. */
+    private val client = OpenRouterClient(mock<SettingsStore>())
+
+    /** Serializer-only tests (sections 8 & 10) exercise kotlinx.serialization directly. */
     private val json = Json {
         ignoreUnknownKeys = true
         encodeDefaults = true
         explicitNulls = false
         coerceInputValues = true
+    }
+
+    private fun parseOk(arguments: String): ExecuteCommand {
+        val result = client.parseCommandDetailed(arguments)
+        assertNull("Expected successful parse but got error: ${result.error}", result.error)
+        assertNotNull("Expected a parsed command for: $arguments", result.command)
+        return result.command!!
+    }
+
+    private fun parseError(arguments: String): String {
+        val result = client.parseCommandDetailed(arguments)
+        assertNull("Expected parse failure but got command: ${result.command}", result.command)
+        assertNotNull("Expected an error message for: $arguments", result.error)
+        return result.error!!
     }
 
     // ═══════════════════════════════════════════════════════
@@ -47,7 +77,7 @@ class CommandParsingEdgeCaseTest {
         }
         """.trimIndent()
 
-        val cmd = json.decodeFromString<ExecuteCommand>(input)
+        val cmd = parseOk(input)
         assertEquals(CommandAction.WRITE_FILE, cmd.action)
         assertEquals("/ext/test.ir", cmd.args.path)
         assertEquals("Filetype: IR\nVersion: 1", cmd.args.content)
@@ -67,7 +97,7 @@ class CommandParsingEdgeCaseTest {
         }
         """.trimIndent()
 
-        val cmd = json.decodeFromString<ExecuteCommand>(input)
+        val cmd = parseOk(input)
         assertEquals(CommandAction.BROWSE_REPO, cmd.action)
         assertEquals("irdb", cmd.args.repoId)
         assertEquals("TVs/Samsung", cmd.args.subPath)
@@ -87,7 +117,7 @@ class CommandParsingEdgeCaseTest {
         }
         """.trimIndent()
 
-        val cmd = json.decodeFromString<ExecuteCommand>(input)
+        val cmd = parseOk(input)
         assertEquals(CommandAction.DOWNLOAD_RESOURCE, cmd.action)
         assertEquals("https://raw.githubusercontent.com/foo/bar/main/remote.ir", cmd.args.downloadUrl)
         assertEquals("/ext/infrared/remote.ir", cmd.args.path)
@@ -107,7 +137,7 @@ class CommandParsingEdgeCaseTest {
         }
         """.trimIndent()
 
-        val cmd = json.decodeFromString<ExecuteCommand>(input)
+        val cmd = parseOk(input)
         assertEquals(CommandAction.GITHUB_SEARCH, cmd.action)
         assertEquals("Samsung TV remote extension:ir", cmd.args.command)
         assertEquals("code", cmd.args.searchScope)
@@ -126,7 +156,7 @@ class CommandParsingEdgeCaseTest {
         }
         """.trimIndent()
 
-        val cmd = json.decodeFromString<ExecuteCommand>(input)
+        val cmd = parseOk(input)
         assertEquals(CommandAction.REQUEST_PHOTO, cmd.action)
         assertEquals("Identify the TV brand and model", cmd.args.photoPrompt)
     }
@@ -146,7 +176,7 @@ class CommandParsingEdgeCaseTest {
         }
         """.trimIndent()
 
-        val cmd = json.decodeFromString<ExecuteCommand>(input)
+        val cmd = parseOk(input)
         assertEquals(CommandAction.LED_CONTROL, cmd.action)
         assertEquals(255, cmd.args.red)
         assertEquals(128, cmd.args.green)
@@ -164,59 +194,32 @@ class CommandParsingEdgeCaseTest {
         }
         """.trimIndent()
 
-        val cmd = json.decodeFromString<ExecuteCommand>(input)
+        val cmd = parseOk(input)
         assertEquals(CommandAction.GET_DEVICE_INFO, cmd.action)
     }
 
     // ═══════════════════════════════════════════════════════
-    // 2. ACTION ALIAS RESOLUTION via parseCommandAction
-    //    (tested through the fallback parser indirectly)
+    // 2. ACTION ALIAS RESOLUTION via the fallback parser
     // ═══════════════════════════════════════════════════════
 
     @Test
     fun `action alias - camelCase forgePayload normalizes to forge_payload`() {
-        // The fallback parser converts camelCase → snake_case → lowercase
-        // Simulating what parseCommandAction does:
-        val input = "forgePayload"
-        val normalized = input
-            .trim()
-            .replace(Regex("([a-z])([A-Z])"), "$1_$2")
-            .lowercase()
-            .replace(Regex("[^a-z0-9]+"), "_")
-            .trim('_')
-        assertEquals("forge_payload", normalized)
+        val cmd = parseOk("""{"action":"forgePayload","args":{"prompt":"craft a payload"}}""")
+        assertEquals(CommandAction.FORGE_PAYLOAD, cmd.action)
     }
 
     @Test
     fun `action alias - executeCommand maps to execute_cli`() {
-        val input = "executeCommand"
-        val normalized = input
-            .trim()
-            .replace(Regex("([a-z])([A-Z])"), "$1_$2")
-            .lowercase()
-            .replace(Regex("[^a-z0-9]+"), "_")
-            .trim('_')
-        assertEquals("execute_command", normalized)
-        // "execute_command" is listed as an alias for EXECUTE_CLI
+        val cmd = parseOk("""{"action":"executeCommand","args":{"command":"storage info"}}""")
+        assertEquals(CommandAction.EXECUTE_CLI, cmd.action)
     }
 
     @Test
     fun `action alias - hyphenated and spaced forms normalize correctly`() {
-        val variants = listOf(
-            "list-directory" to "list_directory",
-            "LIST DIRECTORY" to "list_directory",
-            "list_directory" to "list_directory",
-            "List-Directory" to "list_directory",
-            "  list_directory  " to "list_directory"
-        )
-        for ((input, expected) in variants) {
-            val normalized = input
-                .trim()
-                .replace(Regex("([a-z])([A-Z])"), "$1_$2")
-                .lowercase()
-                .replace(Regex("[^a-z0-9]+"), "_")
-                .trim('_')
-            assertEquals("Input '$input' should normalize to '$expected'", expected, normalized)
+        val variants = listOf("list-directory", "LIST DIRECTORY", "list_directory", "List-Directory", "  list_directory  ")
+        for (variant in variants) {
+            val cmd = parseOk("""{"action":"$variant","args":{}}""")
+            assertEquals("Input '$variant' should resolve to LIST_DIRECTORY", CommandAction.LIST_DIRECTORY, cmd.action)
         }
     }
 
@@ -227,83 +230,43 @@ class CommandParsingEdgeCaseTest {
     @Test
     fun `fallback - args as stringified JSON object`() {
         // Some models return args as a JSON string: "args": "{\"path\":\"/ext\"}"
-        val root = buildJsonObject {
-            put("action", "list_directory")
-            put("args", """{"path":"/ext/subghz"}""")
-        }
-
-        val argsElement = root["args"]
-        assertTrue("args should be a JsonPrimitive string", argsElement is JsonPrimitive)
-        val inner = (argsElement as JsonPrimitive).content
-        val parsed = json.parseToJsonElement(inner) as JsonObject
-        assertEquals("/ext/subghz", parsed["path"]?.jsonPrimitive?.content)
+        val cmd = parseOk("""{"action":"list_directory","args":"{\"path\":\"/ext/subghz\"}"}""")
+        assertEquals(CommandAction.LIST_DIRECTORY, cmd.action)
+        assertEquals("/ext/subghz", cmd.args.path)
     }
 
     @Test
     fun `fallback - args wrapped in single-element array`() {
         // Some models: "args": [{"path": "/ext"}]
-        val argsElement: JsonElement = JsonArray(listOf(
-            buildJsonObject { put("path", "/ext/nfc") }
-        ))
-
-        val unwrapped = when {
-            argsElement is JsonArray && argsElement.size == 1 && argsElement[0] is JsonObject ->
-                argsElement[0] as JsonObject
-            else -> {
-                fail("Should have unwrapped single-element array")
-                throw AssertionError("Should have unwrapped single-element array")
-            }
-        }
-        assertEquals("/ext/nfc", unwrapped["path"]?.jsonPrimitive?.content)
+        val cmd = parseOk("""{"action":"read_file","args":[{"path":"/ext/nfc"}]}""")
+        assertEquals(CommandAction.READ_FILE, cmd.action)
+        assertEquals("/ext/nfc", cmd.args.path)
     }
 
     @Test
     fun `fallback - args as empty array yields empty object`() {
-        val argsElement: JsonElement = JsonArray(emptyList())
-        val result = when {
-            argsElement is JsonArray && argsElement.isEmpty() -> JsonObject(emptyMap())
-            else -> {
-                fail("Should have produced empty JsonObject")
-                throw AssertionError("Should have produced empty JsonObject")
-            }
-        }
-        assertTrue(result.isEmpty())
+        val cmd = parseOk("""{"action":"get_device_info","args":[]}""")
+        assertEquals(CommandAction.GET_DEVICE_INFO, cmd.action)
     }
 
     @Test
     fun `fallback - null args yields empty object`() {
-        val root = buildJsonObject {
-            put("action", "get_device_info")
-            // no "args" key
-        }
-        val argsElement = root["args"]
-        assertNull(argsElement)
-        // Fallback parser would use JsonObject(emptyMap())
+        val cmd = parseOk("""{"action":"get_device_info"}""")
+        assertEquals(CommandAction.GET_DEVICE_INFO, cmd.action)
     }
 
     @Test
     fun `fallback - empty string args yields empty object`() {
-        val root = buildJsonObject {
-            put("action", "get_storage_info")
-            put("args", "")
-        }
-        val argsElement = root["args"]!!
-        assertTrue(argsElement is JsonPrimitive)
-        val inner = (argsElement as JsonPrimitive).content
-        assertTrue(inner.isBlank())
-        // Fallback parser would use JsonObject(emptyMap())
+        val cmd = parseOk("""{"action":"get_storage_info","args":""}""")
+        assertEquals(CommandAction.GET_STORAGE_INFO, cmd.action)
     }
 
     @Test
     fun `fallback - top-level JSON wrapped in single-element array`() {
         // Some models: [{"action":"list_directory","args":{"path":"/ext"}}]
-        val input = """[{"action":"list_directory","args":{"path":"/ext"},"justification":"test","expected_effect":"test"}]"""
-        val element = json.parseToJsonElement(input)
-        assertTrue(element is JsonArray)
-        val unwrapped = (element as JsonArray)[0]
-        assertTrue(unwrapped is JsonObject)
-        val root = unwrapped as JsonObject
-        assertEquals("list_directory", root["action"]?.jsonPrimitive?.content)
+        val cmd = parseOk("""[{"action":"list_directory","args":{"path":"/ext"}}]""")
+        assertEquals(CommandAction.LIST_DIRECTORY, cmd.action)
+        assertEquals("/ext", cmd.args.path)
     }
 
     // ═══════════════════════════════════════════════════════
@@ -312,126 +275,78 @@ class CommandParsingEdgeCaseTest {
 
     @Test
     fun `field alias - command can be extracted from cmd key`() {
-        val args = buildJsonObject { put("cmd", "storage list /ext") }
-        val value = listOf("command", "cmd").firstNotNullOfOrNull { key ->
-            args[key]?.jsonPrimitive?.contentOrNull
-        }
-        assertEquals("storage list /ext", value)
+        val cmd = parseOk("""{"action":"execute_cli","args":{"cmd":"storage list /ext"}}""")
+        assertEquals("storage list /ext", cmd.args.command)
     }
 
     @Test
     fun `field alias - path can be extracted from file_path key`() {
-        val args = buildJsonObject { put("file_path", "/ext/test.sub") }
-        val value = listOf("path", "file_path", "filepath").firstNotNullOfOrNull { key ->
-            args[key]?.jsonPrimitive?.contentOrNull
-        }
-        assertEquals("/ext/test.sub", value)
+        val cmd = parseOk("""{"action":"read_file","args":{"file_path":"/ext/test.sub"}}""")
+        assertEquals("/ext/test.sub", cmd.args.path)
     }
 
     @Test
     fun `field alias - destination_path can be extracted from dest key`() {
-        val args = buildJsonObject { put("dest", "/ext/backup/test.sub") }
-        val value = listOf("destination_path", "destinationPath", "dest", "destination").firstNotNullOfOrNull { key ->
-            args[key]?.jsonPrimitive?.contentOrNull
-        }
-        assertEquals("/ext/backup/test.sub", value)
+        val cmd = parseOk("""{"action":"move","args":{"path":"/ext/a.sub","dest":"/ext/backup/a.sub"}}""")
+        assertEquals("/ext/backup/a.sub", cmd.args.destinationPath)
     }
 
     @Test
     fun `field alias - download_url separated from content`() {
-        // Critical test: download_url should map to downloadUrl, NOT content
-        val args = buildJsonObject {
-            put("download_url", "https://example.com/file.ir")
-            put("content", "some text content")
-        }
-
-        // downloadUrl extraction
-        val downloadUrl = listOf("download_url", "downloadUrl", "url").firstNotNullOfOrNull { key ->
-            args[key]?.jsonPrimitive?.contentOrNull
-        }
-        assertEquals("https://example.com/file.ir", downloadUrl)
-
-        // content extraction (should NOT include download_url)
-        val content = listOf("content", "text", "data").firstNotNullOfOrNull { key ->
-            args[key]?.jsonPrimitive?.contentOrNull
-        }
-        assertEquals("some text content", content)
+        // Critical: download_url must map to downloadUrl, NOT content.
+        val cmd = parseOk(
+            """{"action":"download_resource","args":{"download_url":"https://example.com/file.ir","content":"some text content","path":"/ext/infrared/file.ir"}}"""
+        )
+        assertEquals("https://example.com/file.ir", cmd.args.downloadUrl)
+        assertEquals("some text content", cmd.args.content)
     }
 
     @Test
     fun `field alias - repo_id from repoId camelCase`() {
-        val args = buildJsonObject { put("repoId", "irdb") }
-        val value = listOf("repo_id", "repoId", "repo").firstNotNullOfOrNull { key ->
-            args[key]?.jsonPrimitive?.contentOrNull
-        }
-        assertEquals("irdb", value)
+        val cmd = parseOk("""{"action":"browse_repo","args":{"repoId":"irdb"}}""")
+        assertEquals("irdb", cmd.args.repoId)
     }
 
     @Test
     fun `field alias - sub_path from subPath camelCase`() {
-        val args = buildJsonObject { put("subPath", "TVs/LG") }
-        val value = listOf("sub_path", "subPath").firstNotNullOfOrNull { key ->
-            args[key]?.jsonPrimitive?.contentOrNull
-        }
-        assertEquals("TVs/LG", value)
+        val cmd = parseOk("""{"action":"browse_repo","args":{"repo_id":"irdb","subPath":"TVs/LG"}}""")
+        assertEquals("TVs/LG", cmd.args.subPath)
     }
 
     @Test
     fun `field alias - search_scope from scope shorthand`() {
-        val args = buildJsonObject { put("scope", "repositories") }
-        val value = listOf("search_scope", "searchScope", "scope").firstNotNullOfOrNull { key ->
-            args[key]?.jsonPrimitive?.contentOrNull
-        }
-        assertEquals("repositories", value)
+        val cmd = parseOk("""{"action":"github_search","args":{"command":"query","scope":"repositories"}}""")
+        assertEquals("repositories", cmd.args.searchScope)
     }
 
     @Test
     fun `field alias - photo_prompt from photoPrompt camelCase`() {
-        val args = buildJsonObject { put("photoPrompt", "What TV is this?") }
-        val value = listOf("photo_prompt", "photoPrompt").firstNotNullOfOrNull { key ->
-            args[key]?.jsonPrimitive?.contentOrNull
-        }
-        assertEquals("What TV is this?", value)
+        val cmd = parseOk("""{"action":"request_photo","args":{"photoPrompt":"What TV is this?"}}""")
+        assertEquals("What TV is this?", cmd.args.photoPrompt)
     }
 
     @Test
     fun `field alias - boolean recursive from string true`() {
-        val args = buildJsonObject { put("recursive", "true") }
-        val prim = args["recursive"]?.jsonPrimitive
-        val value = prim?.booleanOrNull ?: when (prim?.contentOrNull?.lowercase()) {
-            "true", "1", "yes" -> true
-            "false", "0", "no" -> false
-            else -> null
-        }
-        assertEquals(true, value)
+        val cmd = parseOk("""{"action":"delete","args":{"path":"/ext/dir","recursive":"true"}}""")
+        assertTrue(cmd.args.recursive)
     }
 
     @Test
     fun `field alias - boolean enabled from string 1`() {
-        val args = buildJsonObject { put("enabled", "1") }
-        val prim = args["enabled"]?.jsonPrimitive
-        val value = prim?.booleanOrNull ?: when (prim?.contentOrNull?.lowercase()) {
-            "true", "1", "yes" -> true
-            "false", "0", "no" -> false
-            else -> null
-        }
-        assertEquals(true, value)
+        val cmd = parseOk("""{"action":"vibro_control","args":{"enabled":"1"}}""")
+        assertEquals(true, cmd.args.enabled)
     }
 
     @Test
     fun `field alias - integer red from string`() {
-        val args = buildJsonObject { put("red", "255") }
-        val prim = args["red"]?.jsonPrimitive
-        val value = prim?.intOrNull ?: prim?.contentOrNull?.toIntOrNull()
-        assertEquals(255, value)
+        val cmd = parseOk("""{"action":"led_control","args":{"red":"255"}}""")
+        assertEquals(255, cmd.args.red)
     }
 
     @Test
     fun `field alias - frequency from string`() {
-        val args = buildJsonObject { put("freq", "433920000") }
-        val prim = args["freq"]?.jsonPrimitive
-        val value = prim?.longOrNull ?: prim?.contentOrNull?.toLongOrNull()
-        assertEquals(433920000L, value)
+        val cmd = parseOk("""{"action":"subghz_transmit","args":{"path":"/ext/subghz/x.sub","freq":"433920000"}}""")
+        assertEquals(433920000L, cmd.args.frequency)
     }
 
     // ═══════════════════════════════════════════════════════
@@ -442,19 +357,8 @@ class CommandParsingEdgeCaseTest {
     fun `fallback - field found at root level when missing from args`() {
         // Some models put fields at root instead of inside args:
         // {"action":"read_file","path":"/ext/test","args":{}}
-        val root = buildJsonObject {
-            put("action", "read_file")
-            put("path", "/ext/test.sub")
-            putJsonObject("args") {}
-        }
-
-        val argsObj = root["args"] as JsonObject
-        // stringArg checks argsObject first, then root
-        val path = listOf("path", "file_path").firstNotNullOfOrNull { key ->
-            argsObj[key]?.jsonPrimitive?.contentOrNull
-                ?: root[key]?.jsonPrimitive?.contentOrNull
-        }
-        assertEquals("/ext/test.sub", path)
+        val cmd = parseOk("""{"action":"read_file","path":"/ext/test.sub","args":{}}""")
+        assertEquals("/ext/test.sub", cmd.args.path)
     }
 
     // ═══════════════════════════════════════════════════════
@@ -463,71 +367,32 @@ class CommandParsingEdgeCaseTest {
 
     @Test
     fun `error - completely broken JSON`() {
-        val input = "this is not json at all"
-        val result = runCatching { json.parseToJsonElement(input) }
-        assertTrue(result.isFailure)
+        val error = parseError("this is not json at all")
+        assertTrue(error.isNotBlank())
     }
 
     @Test
     fun `error - JSON object missing action field`() {
-        val root = buildJsonObject {
-            putJsonObject("args") { put("path", "/ext") }
-        }
-        val actionValue = root["action"]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
-        assertTrue(actionValue.isEmpty())
+        val error = parseError("""{"args":{"path":"/ext"}}""")
+        assertTrue("Error should mention the action field: $error", error.contains("action"))
     }
 
     @Test
     fun `error - unsupported action value`() {
-        val normalized = "do_something_unknown"
-            .trim()
-            .replace(Regex("([a-z])([A-Z])"), "$1_$2")
-            .lowercase()
-            .replace(Regex("[^a-z0-9]+"), "_")
-            .trim('_')
-
-        // This should not match any known action
-        val knownActions = setOf(
-            "list_directory", "read_file", "write_file", "create_directory",
-            "delete", "move", "rename", "copy", "get_device_info",
-            "get_storage_info", "search_faphub", "install_faphub_app",
-            "push_artifact", "execute_cli", "forge_payload",
-            "search_resources", "browse_repo", "download_resource",
-            "github_search", "list_vault", "run_runbook",
-            "launch_app", "subghz_transmit", "ir_transmit",
-            "nfc_emulate", "rfid_emulate", "ibutton_emulate",
-            "badusb_execute", "ble_spam", "led_control",
-            "vibro_control", "request_photo"
-        )
-        assertFalse(knownActions.contains(normalized))
+        val error = parseError("""{"action":"do_something_unknown","args":{}}""")
+        assertTrue("Error should flag the unsupported action: $error", error.contains("Unsupported action"))
     }
 
     @Test
     fun `error - args is a multi-element array`() {
-        val argsElement: JsonElement = JsonArray(listOf(
-            buildJsonObject { put("path", "/ext/a") },
-            buildJsonObject { put("path", "/ext/b") }
-        ))
-
-        // The parser should reject multi-element arrays
-        val isInvalid = argsElement is JsonArray && argsElement.size > 1
-        assertTrue(isInvalid)
+        val error = parseError("""{"action":"list_directory","args":[{"path":"/ext/a"},{"path":"/ext/b"}]}""")
+        assertTrue("Error should mention args: $error", error.contains("args"))
     }
 
     @Test
     fun `error - args is a bare number`() {
-        val root = buildJsonObject {
-            put("action", "list_directory")
-            put("args", 42)
-        }
-        val argsElement = root["args"]!!
-        assertTrue(argsElement is JsonPrimitive)
-        val inner = (argsElement as JsonPrimitive).contentOrNull.orEmpty()
-        // "42" is not blank, so the parser tries to parse it as JSON...
-        val parsed = runCatching { json.parseToJsonElement(inner) }.getOrNull()
-        // ...which succeeds but gives a primitive, not an object
-        assertNotNull(parsed)
-        assertFalse(parsed is JsonObject)
+        val error = parseError("""{"action":"list_directory","args":42}""")
+        assertTrue("Error should mention args: $error", error.contains("args"))
     }
 
     // ═══════════════════════════════════════════════════════
@@ -536,21 +401,12 @@ class CommandParsingEdgeCaseTest {
 
     @Test
     fun `fallback - parameters key used instead of args`() {
-        val root = buildJsonObject {
-            put("action", "read_file")
-            putJsonObject("parameters") {
-                put("path", "/ext/infrared/tv.ir")
-            }
-        }
-        // The parser checks root["args"] ?: root["parameters"]
-        val argsElement = root["args"] ?: root["parameters"]
-        assertNotNull(argsElement)
-        assertTrue(argsElement is JsonObject)
-        assertEquals("/ext/infrared/tv.ir", (argsElement as JsonObject)["path"]?.jsonPrimitive?.content)
+        val cmd = parseOk("""{"action":"read_file","parameters":{"path":"/ext/infrared/tv.ir"}}""")
+        assertEquals("/ext/infrared/tv.ir", cmd.args.path)
     }
 
     // ═══════════════════════════════════════════════════════
-    // 8. ArgumentsAsStringSerializer coverage
+    // 8. ArgumentsAsStringSerializer coverage (serializer-level)
     // ═══════════════════════════════════════════════════════
 
     @Test
@@ -579,7 +435,7 @@ class CommandParsingEdgeCaseTest {
 
     @Test
     fun `install_faphub_app with command and download_url`() {
-        // In strict path: "command" maps to CommandArgs.command, "download_url" maps to downloadUrl
+        // Strict path: "command" maps to CommandArgs.command, "download_url" maps to downloadUrl.
         val input = """
         {
             "action": "install_faphub_app",
@@ -592,7 +448,7 @@ class CommandParsingEdgeCaseTest {
         }
         """.trimIndent()
 
-        val cmd = json.decodeFromString<ExecuteCommand>(input)
+        val cmd = parseOk(input)
         assertEquals(CommandAction.INSTALL_FAPHUB_APP, cmd.action)
         assertEquals("wifi_marauder", cmd.args.command)
         assertEquals("https://example.com/marauder.fap", cmd.args.downloadUrl)
@@ -600,16 +456,14 @@ class CommandParsingEdgeCaseTest {
 
     @Test
     fun `install_faphub_app fallback - app_id alias maps to command`() {
-        // In the fallback parser, "app_id" is an alias for "command"
-        // This test validates the alias list covers app_id
-        val args = buildJsonObject { put("app_id", "wifi_marauder") }
-        val value = listOf("command", "cmd", "query", "app_id", "appId", "app", "package", "name")
-            .firstNotNullOfOrNull { key -> args[key]?.jsonPrimitive?.contentOrNull }
-        assertEquals("wifi_marauder", value)
+        // In the fallback parser, "app_id" is an alias for "command".
+        val cmd = parseOk("""{"action":"install_faphub_app","args":{"app_id":"wifi_marauder"}}""")
+        assertEquals(CommandAction.INSTALL_FAPHUB_APP, cmd.action)
+        assertEquals("wifi_marauder", cmd.args.command)
     }
 
     // ═══════════════════════════════════════════════════════
-    // 10. FULL END-TO-END STRICT DESERIALIZATION OF EVERY ACTION
+    // 10. FULL END-TO-END SERIALIZER ROUND-TRIPS
     // ═══════════════════════════════════════════════════════
 
     @Test

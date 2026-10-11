@@ -70,6 +70,22 @@ enum class Modulation(val displayName: String) {
     PSK("PSK (Phase Shift Keying)")
 }
 
+/**
+ * Extract a hex key from a `.sub` file's `Key:` line. Flipper (and ForgeEngine)
+ * write the value as space-separated bytes, e.g. `Key: 00 00 00 00 00 AB CD EF`.
+ * Normalize to a contiguous uppercase hex string; reject non-hex or odd lengths.
+ */
+internal fun extractSubGhzKey(rawData: String): String? {
+    // Capture the whole value to the end of the `Key:` line (not just a leading
+    // hex-looking prefix) so trailing junk like "Key: AB CD ZZ" or tab-separated
+    // bytes are validated and rejected instead of being silently truncated.
+    val raw = Regex("Key:\\s*(.*)").find(rawData)?.groupValues?.get(1) ?: return null
+    val normalized = raw.filterNot { it.isWhitespace() }.uppercase()
+    if (normalized.isEmpty() || normalized.length % 2 != 0) return null
+    if (!normalized.all { it in "0123456789ABCDEF" }) return null
+    return normalized
+}
+
 // ==================== Protocol Implementations ====================
 
 /**
@@ -82,8 +98,7 @@ object PrincetonProtocol : SubGhzProtocol(
 ) {
     override fun parse(rawData: String): ParsedSignal? {
         // Princeton format: 24-bit code (20 address + 4 data)
-        val match = Regex("Key:([A-F0-9]+)").find(rawData) ?: return null
-        val key = match.groupValues[1]
+        val key = extractSubGhzKey(rawData) ?: return null
 
         if (key.length < 6) return null
 
@@ -142,8 +157,7 @@ object CameProtocol : SubGhzProtocol(
     modulation = Modulation.OOK
 ) {
     override fun parse(rawData: String): ParsedSignal? {
-        val keyMatch = Regex("Key:([A-F0-9]+)").find(rawData) ?: return null
-        val key = keyMatch.groupValues[1]
+        val key = extractSubGhzKey(rawData) ?: return null
 
         return ParsedSignal(
             protocol = name,
@@ -352,8 +366,7 @@ object NiceFloProtocol : SubGhzProtocol(
     modulation = Modulation.OOK
 ) {
     override fun parse(rawData: String): ParsedSignal? {
-        val keyMatch = Regex("Key:([A-F0-9]+)").find(rawData) ?: return null
-        val key = keyMatch.groupValues[1]
+        val key = extractSubGhzKey(rawData) ?: return null
 
         return ParsedSignal(
             protocol = name,

@@ -87,8 +87,18 @@ class BleServiceManager @Inject constructor(
         if (_isServiceBound.value || isBinding) return
         isBinding = true
         FlipperBleService.startService(context)
-        Intent(context, FlipperBleService::class.java).also { intent ->
+        val intent = Intent(context, FlipperBleService::class.java)
+        val bound = try {
             context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+        } catch (_: SecurityException) {
+            false
+        }
+        if (!bound) {
+            // bindService() returned false (or threw): the connection is left
+            // half-registered. Release it and clear isBinding so awaitService()
+            // can retry instead of timing out forever.
+            runCatching { context.unbindService(serviceConnection) }
+            isBinding = false
         }
     }
 

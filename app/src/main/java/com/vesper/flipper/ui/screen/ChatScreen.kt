@@ -544,7 +544,7 @@ private fun ChatMessageItem(
                     Icon(
                         imageVector = Icons.Default.Terminal,
                         contentDescription = null,
-                        tint = Color.White,
+                        tint = MaterialTheme.colorScheme.onSecondary,
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -603,7 +603,7 @@ private fun ChatMessageItem(
                     if (message.content.isNotEmpty()) {
                         Text(
                             text = message.content,
-                            color = if (isUser) Color.White else MaterialTheme.colorScheme.onSurface,
+                            color = if (isUser) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
@@ -651,7 +651,7 @@ private fun ChatMessageItem(
                             clipboard.setPrimaryClip(ClipData.newPlainText("message", message.content))
                             Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
                         },
-                        modifier = Modifier.size(28.dp)
+                        modifier = Modifier.size(48.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.ContentCopy,
@@ -671,7 +671,7 @@ private fun ChatMessageItem(
                                     onSpeak!!(message.content)
                                 }
                             },
-                            modifier = Modifier.size(28.dp)
+                            modifier = Modifier.size(48.dp)
                         ) {
                             if (isLoading) {
                                 CircularProgressIndicator(
@@ -1100,7 +1100,7 @@ private fun ChatInputBar(
                     if (isLoading) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(20.dp),
-                            color = Color.White,
+                            color = MaterialTheme.colorScheme.onPrimary,
                             strokeWidth = 2.dp
                         )
                     } else {
@@ -1142,7 +1142,7 @@ private fun VoiceInputIndicator(
                 Icon(
                     Icons.Default.Mic,
                     contentDescription = null,
-                    tint = Color.White,
+                    tint = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier.size(18.dp)
                 )
             }
@@ -1344,7 +1344,7 @@ private fun ChatHistorySheet(
                                             "Active",
                                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = Color.White
+                                            color = MaterialTheme.colorScheme.onTertiary
                                         )
                                     }
                                 }

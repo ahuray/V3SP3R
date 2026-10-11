@@ -13,7 +13,7 @@
 
 No menus. No manuals. Just natural language prompting.
 
-[![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
 [![Android](https://img.shields.io/badge/Android-8.0%2B-green.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.2-purple.svg)](https://kotlinlang.org)
 
@@ -377,7 +377,7 @@ Found a vulnerability? Please report it responsibly. See [SECURITY.md](SECURITY.
 
 ## License
 
-GPL-3.0 — see [LICENSE](LICENSE) for the full text.
+AGPL-3.0 — see [LICENSE](LICENSE) for the full text.
 
 ---
 

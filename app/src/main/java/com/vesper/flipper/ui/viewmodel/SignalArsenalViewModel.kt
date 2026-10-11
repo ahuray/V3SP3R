@@ -168,31 +168,35 @@ class SignalArsenalViewModel @Inject constructor(
         viewModelScope.launch {
             _isReplaying.value = true
             _error.value = null
+            _replaySuccess.value = null
 
             try {
-                // The replay would trigger the appropriate Flipper action
-                // For now, we simulate the action
-                when (signal) {
-                    is SignalCapture.SubGhz -> {
-                        // Trigger SubGHz transmit
-                        _replaySuccess.value = "Transmitting ${signal.name} at ${formatFrequency(signal.frequency)}"
-                    }
-                    is SignalCapture.Infrared -> {
-                        _replaySuccess.value = "Sending IR: ${signal.name} (${signal.protocol})"
-                    }
-                    is SignalCapture.Nfc -> {
-                        _replaySuccess.value = "NFC emulation ready: ${signal.name}"
-                    }
-                    is SignalCapture.Rfid -> {
-                        _replaySuccess.value = "RFID emulation ready: ${signal.name}"
-                    }
-                    is SignalCapture.IButton -> {
-                        _replaySuccess.value = "iButton emulation ready: ${signal.name}"
-                    }
+                // Issue the real device command (same mapping CommandExecutor uses)
+                // and report its actual result instead of assuming success.
+                val path = signal.path
+                val command = when (signal) {
+                    is SignalCapture.SubGhz -> "subghz tx_from_file $path"
+                    is SignalCapture.Infrared -> "ir tx $path"
+                    is SignalCapture.Nfc -> "nfc emulate $path"
+                    is SignalCapture.Rfid -> "rfid emulate $path"
+                    is SignalCapture.IButton -> "ibutton emulate $path"
                 }
 
-                // Simulate transmission delay
-                kotlinx.coroutines.delay(1500)
+                fileSystem.executeCli(command).fold(
+                    onSuccess = {
+                        _replaySuccess.value = when (signal) {
+                            is SignalCapture.SubGhz ->
+                                "Transmitted ${signal.name} at ${formatFrequency(signal.frequency)}"
+                            is SignalCapture.Infrared -> "Sent IR: ${signal.name} (${signal.protocol})"
+                            is SignalCapture.Nfc -> "Emulating NFC: ${signal.name}"
+                            is SignalCapture.Rfid -> "Emulating RFID: ${signal.name}"
+                            is SignalCapture.IButton -> "Emulating iButton: ${signal.name}"
+                        }
+                    },
+                    onFailure = { e ->
+                        _error.value = "Replay failed: ${e.message ?: "device error"}"
+                    }
+                )
             } catch (e: Exception) {
                 _error.value = "Replay failed: ${e.message}"
             } finally {

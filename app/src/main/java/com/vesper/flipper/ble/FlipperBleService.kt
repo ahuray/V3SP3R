@@ -62,6 +62,8 @@ class FlipperBleService : Service() {
     private var bleKeepaliveJob: Job? = null
     private var usbReceiverRegistered = false
     private var broadScanStarted = false
+    private var scanTimeoutJob: Job? = null
+    private var connectionTimeoutJob: Job? = null
 
     private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected)
     val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
@@ -314,8 +316,10 @@ class FlipperBleService : Service() {
             }
         }
 
-        // Auto-stop scan after timeout
-        serviceScope.launch {
+        // Auto-stop scan after timeout. Keep a single job so stopping and
+        // restarting a scan cannot leave an older timeout that stops the new one.
+        scanTimeoutJob?.cancel()
+        scanTimeoutJob = serviceScope.launch {
             delay(SCAN_TIMEOUT_MS)
             stopScan()
         }
@@ -342,6 +346,8 @@ class FlipperBleService : Service() {
 
     @SuppressLint("MissingPermission")
     fun stopScan() {
+        scanTimeoutJob?.cancel()
+        scanTimeoutJob = null
         if (hasBluetoothPermissions()) {
             bleScanner?.stopScan(scanCallback)
             bleScanner?.stopScan(broadScanCallback)
@@ -511,6 +517,26 @@ class FlipperBleService : Service() {
             pendingConnectionName = null
             _connectionState.value = ConnectionState.Error("Failed to initiate BLE connection to ${device.name}")
             updateNotification()
+        } else {
+            startConnectionWatchdog(device.name)
+        }
+    }
+
+    /**
+     * Fail a connection attempt that never completes. If no connect or
+     * service-discovery callback resolves the [ConnectionState.Connecting] state
+     * within the deadline, tear down the GATT and report a recoverable error so
+     * the UI is not stuck on "Connecting".
+     */
+    private fun startConnectionWatchdog(deviceName: String) {
+        connectionTimeoutJob?.cancel()
+        connectionTimeoutJob = serviceScope.launch {
+            delay(BLE_CONNECTION_TIMEOUT_MS)
+            if (_connectionState.value is ConnectionState.Connecting) {
+                runCatching { disconnectBleTransport() }
+                _connectionState.value = ConnectionState.Error("Connection to $deviceName timed out")
+                updateNotification()
+            }
         }
     }
 
@@ -924,11 +950,15 @@ class FlipperBleService : Service() {
 
     @SuppressLint("MissingPermission")
     private fun disconnectBleTransport() {
+        connectionTimeoutJob?.cancel()
+        connectionTimeoutJob = null
         bluetoothGatt?.let { gatt ->
+            // disconnect() needs the connect permission, but close() does not and
+            // must always run so a revoked permission cannot leak the GATT.
             if (hasBluetoothPermissions()) {
                 runCatching { gatt.disconnect() }
-                runCatching { gatt.close() }
             }
+            runCatching { gatt.close() }
         }
         bluetoothGatt = null
         serialCharacteristic = null
@@ -1707,6 +1737,8 @@ class FlipperBleService : Service() {
     }
 
     private fun finalizeConnectedState(device: FlipperDevice) {
+        connectionTimeoutJob?.cancel()
+        connectionTimeoutJob = null
         pendingConnectionName = null
         pendingConnectedDevice = null
         activeTransport = CommandTransport.BLE
@@ -2416,6 +2448,7 @@ class FlipperBleService : Service() {
         const val NOTIFICATION_ID = 1
 
         const val SCAN_TIMEOUT_MS = 30_000L
+        private const val BLE_CONNECTION_TIMEOUT_MS = 20_000L
         private const val BROAD_SCAN_FALLBACK_DELAY_MS = 4_000L
         private const val MAX_DISCOVERED_DEVICES = 60
 

@@ -55,15 +55,7 @@ fun SpectralOracleScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0xFF0D0D1A),
-                        Color(0xFF1A0D2E),
-                        Color(0xFF0D0D1A)
-                    )
-                )
-            )
+            .background(brush = VesperBackdropBrush)
     ) {
         // Animated background effect
         OracleBackground(isAnalyzing = isAnalyzing)

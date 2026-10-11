@@ -51,9 +51,9 @@ fun DeviceTrackerScreen(
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
-                        Color(0xFF0D0D0D),
-                        Color(0xFF1A1A2E),
-                        Color(0xFF0D0D0D)
+                        MaterialTheme.colorScheme.background,
+                        MaterialTheme.colorScheme.surface,
+                        MaterialTheme.colorScheme.background
                     )
                 )
             )
@@ -87,7 +87,7 @@ fun DeviceTrackerScreen(
                 },
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedBorderColor = Color(0xFF333333),
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
                     focusedBorderColor = Color(0xFF00BCD4)
                 ),
                 shape = RoundedCornerShape(12.dp)
@@ -142,7 +142,7 @@ fun DeviceTrackerScreen(
                 Text(
                     text = "${devices.size} devices",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color.Gray
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 Box {
@@ -200,18 +200,18 @@ fun DeviceTrackerScreen(
                                     Icons.Default.DevicesOther,
                                     contentDescription = null,
                                     modifier = Modifier.size(64.dp),
-                                    tint = Color(0xFF444444)
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Spacer(modifier = Modifier.height(16.dp))
                                 Text(
-                                    text = "No devices tracked yet",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = Color.Gray
-                                )
+                    text = "No devices tracked yet",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                                 Text(
                                     text = "Scan for BLE, Sub-GHz, or NFC devices",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = Color(0xFF666666)
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
@@ -248,7 +248,7 @@ private fun DeviceTrackerHeader(
                 text = "📡 Device Tracker",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
-                color = Color.White
+                color = MaterialTheme.colorScheme.onBackground
             )
             Text(
                 text = "$recentDevices active in last 24h",
@@ -291,7 +291,7 @@ private fun StatBadge(
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
-            color = Color.Gray
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
@@ -309,7 +309,7 @@ private fun TrackedDeviceCard(
             .fillMaxWidth()
             .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(
-            containerColor = Color(0xFF1E1E2E)
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
         ),
         shape = RoundedCornerShape(16.dp)
     ) {
@@ -353,7 +353,7 @@ private fun TrackedDeviceCard(
                         text = device.alias ?: device.name ?: "Unknown Device",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false)
@@ -376,7 +376,7 @@ private fun TrackedDeviceCard(
                 Text(
                     text = device.identifier,
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFF888888),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -400,13 +400,13 @@ private fun TrackedDeviceCard(
                             Icons.Default.Visibility,
                             contentDescription = null,
                             modifier = Modifier.size(12.dp),
-                            tint = Color.Gray
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.width(2.dp))
                         Text(
                             text = "${device.sightingCount}x",
                             style = MaterialTheme.typography.labelSmall,
-                            color = Color.Gray
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
 
@@ -414,7 +414,7 @@ private fun TrackedDeviceCard(
                     Text(
                         text = dateFormat.format(Date(device.lastSeen)),
                         style = MaterialTheme.typography.labelSmall,
-                        color = Color.Gray
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -424,7 +424,7 @@ private fun TrackedDeviceCard(
                 Icon(
                     if (device.isFavorite) Icons.Default.Star else Icons.Default.StarBorder,
                     contentDescription = "Toggle favorite",
-                    tint = if (device.isFavorite) Color(0xFFFFD700) else Color.Gray
+                    tint = if (device.isFavorite) Color(0xFFFFD700) else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -462,7 +462,7 @@ private fun DeviceDetailSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = Color(0xFF1E1E2E)
+        containerColor = MaterialTheme.colorScheme.surface
     ) {
         LazyColumn(
             modifier = Modifier
@@ -502,12 +502,12 @@ private fun DeviceDetailSheet(
                             text = device.alias ?: device.name ?: "Unknown Device",
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = device.identifier,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = Color.Gray
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -545,7 +545,7 @@ private fun DeviceDetailSheet(
                 item {
                     Card(
                         colors = CardDefaults.cardColors(
-                            containerColor = Color(0xFF2A2A3E)
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
                         )
                     ) {
                         Column(
@@ -570,7 +570,7 @@ private fun DeviceDetailSheet(
                     text = "Threat Level",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -597,7 +597,7 @@ private fun DeviceDetailSheet(
                         text = "Recent Sightings",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
                 items(sightings.take(5)) { sighting ->
@@ -610,7 +610,7 @@ private fun DeviceDetailSheet(
                         Text(
                             text = dateFormat.format(Date(sighting.timestamp)),
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color.Gray
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         sighting.rssi?.let {
                             Text(
@@ -693,12 +693,12 @@ private fun StatColumn(label: String, value: String) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
-            color = Color.Gray
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text(
             text = value,
             style = MaterialTheme.typography.bodySmall,
-            color = Color.White
+            color = MaterialTheme.colorScheme.onSurface
         )
     }
 }
@@ -714,12 +714,12 @@ private fun InfoRow(label: String, value: String) {
         Text(
             text = label,
             style = MaterialTheme.typography.bodyMedium,
-            color = Color.Gray
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text(
             text = value,
             style = MaterialTheme.typography.bodyMedium,
-            color = Color.White
+            color = MaterialTheme.colorScheme.onSurface
         )
     }
 }

@@ -49,7 +49,14 @@ class DeviceTrackerViewModel @Inject constructor(
         query to showHidden
     }.flatMapLatest { (query, showHidden) ->
         if (query.isNotEmpty()) {
-            repository.searchDevices(query)
+            // searchDevices returns hidden devices too; respect the toggle.
+            if (showHidden) {
+                repository.searchDevices(query)
+            } else {
+                repository.searchDevices(query).map { results ->
+                    results.filter { !it.isHidden }
+                }
+            }
         } else if (showHidden) {
             repository.getAllDevices()
         } else {

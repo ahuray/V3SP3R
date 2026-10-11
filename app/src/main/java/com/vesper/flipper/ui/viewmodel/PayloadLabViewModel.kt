@@ -417,29 +417,62 @@ class PayloadLabViewModel @Inject constructor(
     }
 
     private suspend fun encodeScreenshot(uri: Uri): String = withContext(Dispatchers.IO) {
-        val inputStream = context.contentResolver.openInputStream(uri)
-            ?: throw Exception("Cannot read image")
-        val bitmap = BitmapFactory.decodeStream(inputStream)
-        inputStream.close()
-
-        // Resize if needed
         val maxSize = 1024
-        val scaledBitmap = if (bitmap.width > maxSize || bitmap.height > maxSize) {
-            val ratio = bitmap.width.toFloat() / bitmap.height
-            val (newWidth, newHeight) = if (bitmap.width > bitmap.height) {
-                maxSize to (maxSize / ratio).toInt()
-            } else {
-                (maxSize * ratio).toInt() to maxSize
-            }
-            Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
-        } else {
-            bitmap
+
+        // Read only the image bounds first so a huge gallery image is never
+        // fully decoded into memory.
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        context.contentResolver.openInputStream(uri).use { stream ->
+            stream ?: throw Exception("Cannot read image")
+            BitmapFactory.decodeStream(stream, null, bounds)
+        }
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+            throw Exception("Cannot decode image")
         }
 
-        // Encode to base64
-        val outputStream = ByteArrayOutputStream()
-        scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 85, outputStream)
-        Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP)
+        // Downsample during decode to roughly the target size.
+        val decodeOptions = BitmapFactory.Options().apply {
+            inSampleSize = computeInSampleSize(bounds.outWidth, bounds.outHeight, maxSize)
+        }
+        val bitmap = context.contentResolver.openInputStream(uri).use { stream ->
+            stream ?: throw Exception("Cannot read image")
+            BitmapFactory.decodeStream(stream, null, decodeOptions)
+        } ?: throw Exception("Cannot decode image")
+
+        var scaledBitmap: Bitmap? = null
+        try {
+            // Final exact resize so the longest edge is at most maxSize.
+            scaledBitmap = if (bitmap.width > maxSize || bitmap.height > maxSize) {
+                val ratio = bitmap.width.toFloat() / bitmap.height
+                val (newWidth, newHeight) = if (bitmap.width > bitmap.height) {
+                    maxSize to (maxSize / ratio).toInt().coerceAtLeast(1)
+                } else {
+                    (maxSize * ratio).toInt().coerceAtLeast(1) to maxSize
+                }
+                Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
+            } else {
+                bitmap
+            }
+
+            val outputStream = ByteArrayOutputStream()
+            scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 85, outputStream)
+            Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP)
+        } finally {
+            if (scaledBitmap != null && scaledBitmap !== bitmap) scaledBitmap.recycle()
+            bitmap.recycle()
+        }
+    }
+
+    private fun computeInSampleSize(width: Int, height: Int, maxSize: Int): Int {
+        var sampleSize = 1
+        var w = width
+        var h = height
+        while (w / 2 >= maxSize && h / 2 >= maxSize) {
+            w /= 2
+            h /= 2
+            sampleSize *= 2
+        }
+        return sampleSize
     }
 
     // ============================================================

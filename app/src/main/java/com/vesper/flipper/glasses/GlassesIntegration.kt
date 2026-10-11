@@ -87,6 +87,7 @@ class GlassesIntegration @Inject constructor(
     private var progressListenerJob: Job? = null
     private var approvalListenerJob: Job? = null
     private var configSyncJob: Job? = null
+    private var bridgeStateJob: Job? = null
     private var lastProcessedMessageCount = 0
     private var photoHoldJob: Job? = null
 
@@ -187,6 +188,27 @@ class GlassesIntegration @Inject constructor(
                 }
         }
 
+        // On every (re)connect: reset per-session narration tracking so stale
+        // state from a prior session can't suppress or duplicate glasses output,
+        // and push the current config immediately so the bridge matches the app
+        // even if no setting changes after connecting.
+        bridgeStateJob = scope.launch {
+            bridge.state.collect { state ->
+                if (state is BridgeState.Connected) {
+                    lastProcessedMessageCount =
+                        vesperAgent.conversationState.value.messages.size
+                    lastSpokenProgressStage = null
+                    lastSpokenProgressDetail = null
+                    bridge.sendConfig(
+                        mapOf(
+                            "sailor_mouth" to settingsStore.glassesSailorMouth.first().toString(),
+                            "muted" to settingsStore.glassesMuted.first().toString()
+                        )
+                    )
+                }
+            }
+        }
+
         // Sync config (sailor mouth, etc.) to bridge on change
         configSyncJob = scope.launch {
             combine(
@@ -216,6 +238,8 @@ class GlassesIntegration @Inject constructor(
         approvalListenerJob = null
         configSyncJob?.cancel()
         configSyncJob = null
+        bridgeStateJob?.cancel()
+        bridgeStateJob = null
     }
 
     /**
@@ -363,9 +387,12 @@ class GlassesIntegration @Inject constructor(
                 return false
             }
 
+            // Check denial first: a phrase like "No, don't do it" contains both
+            // a denial ("no"/"don't") and an approval token ("do it"), and the
+            // user's intent is to reject. Denial must win.
             val approved = when {
-                APPROVE_REGEX.containsMatchIn(text) -> true
                 DENY_REGEX.containsMatchIn(text) -> false
+                APPROVE_REGEX.containsMatchIn(text) -> true
                 else -> return false // Not an approval/denial phrase
             }
 

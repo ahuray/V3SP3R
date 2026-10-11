@@ -15,7 +15,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.io.ByteArrayOutputStream
 import java.io.IOException
+import java.io.InputStream
 import java.net.URI
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -560,7 +562,10 @@ class CommandExecutor @Inject constructor(
             CommandAction.SUBGHZ_TRANSMIT -> {
                 val path = command.args.path
                     ?: throw IllegalArgumentException("Sub-GHz file path required (e.g. /ext/subghz/signal.sub)")
-                val output = fileSystem.executeCli("subghz tx $path").getOrThrow()
+                // The firmware CLI replays a saved .sub via `subghz tx_from_file <path>`
+                // (`subghz tx` parses its first argument as a raw hex key, not a file).
+                // This matches official and custom firmware (Unleashed/RogueMaster/Momentum).
+                val output = fileSystem.executeCli("subghz tx_from_file $path").getOrThrow()
                 CommandResultData(
                     content = output,
                     message = "Transmitted Sub-GHz signal: $path"
@@ -829,13 +834,32 @@ class CommandExecutor @Inject constructor(
             if (!response.isSuccessful) {
                 throw IOException("HTTP ${response.code} while downloading $url")
             }
-            val body = response.body?.bytes()
+            val stream = response.body?.byteStream()
                 ?: throw IOException("Empty download body from $url")
+            // Read with a hard cap so a hostile URL cannot exhaust memory before
+            // the caller's MAX_FAP_BYTES check runs.
+            val body = stream.readBounded(MAX_FAP_BYTES.toLong(), url)
             DownloadedPayload(
                 bytes = body,
                 contentType = response.header("Content-Type")
             )
         }
+    }
+
+    private fun InputStream.readBounded(maxBytes: Long, url: String): ByteArray {
+        val output = ByteArrayOutputStream()
+        val buffer = ByteArray(16 * 1024)
+        var total = 0L
+        while (true) {
+            val read = read(buffer)
+            if (read == -1) break
+            total += read
+            if (total > maxBytes) {
+                throw IOException("Download from $url exceeds maximum size of $maxBytes bytes")
+            }
+            output.write(buffer, 0, read)
+        }
+        return output.toByteArray()
     }
 
     private fun extractFapCandidates(html: String, baseUrl: String): List<String> {

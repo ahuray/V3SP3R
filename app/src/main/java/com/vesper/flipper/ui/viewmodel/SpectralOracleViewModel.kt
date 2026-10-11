@@ -7,11 +7,16 @@ import com.vesper.flipper.ble.FlipperFileSystem
 import com.vesper.flipper.data.SettingsStore
 import com.vesper.flipper.domain.model.*
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -66,6 +71,9 @@ class SpectralOracleViewModel @Inject constructor(
     private val _analysisHistory = MutableStateFlow<List<AnalysisHistoryItem>>(emptyList())
     val analysisHistory: StateFlow<List<AnalysisHistoryItem>> = _analysisHistory.asStateFlow()
 
+    // Currently running analysis, cancelled when the selection changes.
+    private var analysisJob: Job? = null
+
     init {
         loadAvailableSignals()
     }
@@ -97,6 +105,12 @@ class SpectralOracleViewModel @Inject constructor(
     }
 
     fun selectSignal(signal: SignalCapture?) {
+        // Abandon any analysis still running for the previously selected signal
+        // so its result cannot overwrite the new selection.
+        analysisJob?.cancel()
+        analysisJob = null
+        _isAnalyzing.value = false
+        _analysisProgress.value = ""
         _selectedSignal.value = signal
         _analysisResult.value = null
     }
@@ -108,7 +122,8 @@ class SpectralOracleViewModel @Inject constructor(
     fun analyzeSignal() {
         val signal = _selectedSignal.value ?: return
 
-        viewModelScope.launch {
+        analysisJob?.cancel()
+        analysisJob = viewModelScope.launch {
             _isAnalyzing.value = true
             _error.value = null
             _analysisResult.value = null
@@ -145,6 +160,8 @@ class SpectralOracleViewModel @Inject constructor(
 
                 _analysisProgress.value = "Analysis complete"
 
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _error.value = "Analysis failed: ${e.message}"
             } finally {
@@ -230,15 +247,24 @@ class SpectralOracleViewModel @Inject constructor(
             }
         }
 
+    private fun extractMessageContent(responseBody: String): String? {
+        return try {
+            json.parseToJsonElement(responseBody)
+                .jsonObject["choices"]
+                ?.jsonArray?.firstOrNull()
+                ?.jsonObject?.get("message")
+                ?.jsonObject?.get("content")
+                ?.jsonPrimitive?.content
+                ?.takeIf { it.isNotBlank() }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     private fun parseAIResponse(responseBody: String, request: SignalIntelRequest): OracleAnalysisResult {
-        // Extract the AI message content
-        val contentRegex = """"content"\s*:\s*"(.*?)(?<!\\)"""".toRegex(RegexOption.DOT_MATCHES_ALL)
-        val match = contentRegex.find(responseBody)
-        val aiResponse = match?.groupValues?.get(1)
-            ?.replace("\\n", "\n")
-            ?.replace("\\\"", "\"")
-            ?.replace("\\\\", "\\")
-            ?: responseBody
+        // Decode the chat-completion envelope with a real JSON parser so escaped
+        // content (quotes, braces, backslashes) is handled correctly.
+        val aiResponse = extractMessageContent(responseBody) ?: responseBody
 
         // Parse structured sections from AI response
         val sections = parseResponseSections(aiResponse)

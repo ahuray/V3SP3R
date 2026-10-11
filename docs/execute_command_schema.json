@@ -126,7 +126,7 @@
           "type": "string",
           "description": "GitHub repository URL (for browse_repo action)"
         },
-        "resource_url": {
+        "download_url": {
           "type": "string",
           "description": "URL of resource to download (for download_resource action)"
         }
